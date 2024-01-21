@@ -3,7 +3,7 @@
 #include <linux/string.h> // memset()
 #include <linux/cdev.h> // MKDEV(), struct inode, struct file_operations,
 #include <linux/fs.h> // register_chrdev_region(), alloc_chrdev_region()
-#include <linux/errno.h>
+#include <linux/errno.h> // EFAULT, ENOMEM
 #include <linux/types.h> // size_t
 #include <linux/fcntl.h> // O_ACCMODE
 #include <linux/uaccess.h> // copy_to_user(), copy_from_user()
