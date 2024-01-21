@@ -131,6 +131,8 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count,
 	retval = count;
 
   out:
+	PDEBUG("%ld bytes read from scull", count);
+
 	return retval;
 }
 

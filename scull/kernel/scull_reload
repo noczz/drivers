@@ -1,0 +1,6 @@
+module="scull"
+device="scull"
+
+make
+rmmod $module
+insmod $module.ko
