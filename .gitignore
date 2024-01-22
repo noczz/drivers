@@ -13,4 +13,4 @@ core
 *.mod
 modules.order
 *.symvers
-tag
+tags

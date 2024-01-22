@@ -82,7 +82,7 @@ struct scull_qset* scull_follow(struct scull_dev *dev, int item)
 	}
 
 	while(item--) {
-		if(dptr->next) {
+		if(!dptr->next) {
 			dptr->next = kmalloc(sizeof(struct scull_qset),
 					GFP_KERNEL);
 			if(dptr->next == NULL)
@@ -154,9 +154,11 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	s_pos = rest / quantum; q_pos = rest % quantum;
 
 	dptr = scull_follow(dev, item);
-//	PDEBUG("item %d\n", item);
-	if (dptr == NULL)
+	if (dptr == NULL) {
+		PDEBUG("out\n");
 		goto out;
+	}
+	PDEBUG("not out\n");
 	if (!dptr->data) {
 		dptr->data = kmalloc(qset * sizeof(char *), GFP_KERNEL);
 		if (!dptr->data)
@@ -181,6 +183,9 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 
 	if (dev->size < *f_pos)
 		dev->size = *f_pos;
+
+	PDEBUG("item %d s_pos %d q_pos %d count %ld dev->size %ld", 
+			item, s_pos, q_pos, count, dev->size);
   out:
 	return retval;
 }
