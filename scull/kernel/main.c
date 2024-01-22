@@ -13,8 +13,8 @@
 int scull_major = 0;
 int scull_minor = 0;
 int scull_nr_devs = 4;
-int scull_quantum = 1000;
-int scull_qset = 10;
+int scull_quantum = 10;
+int scull_qset = 5;
 
 struct scull_dev *scull_devices;
 
@@ -106,6 +106,7 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = 0;
 
+
 	if (*f_pos >= dev->size)
 		goto out;
 	if (*f_pos + count > dev->size)
@@ -123,6 +124,9 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count,
 	if (count > quantum - q_pos)
 		count = quantum - q_pos;
 
+	PDEBUG("dev->size %lu f_pos %lld\n", dev->size, *f_pos);
+	PDEBUG("s_pos %d q_pos %d count %ld", s_pos, q_pos , count);
+
 	if (copy_to_user(buf, dptr->data[s_pos] + q_pos, count)) {
 		retval = -EFAULT;
 		goto out;
@@ -131,7 +135,6 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count,
 	retval = count;
 
   out:
-	PDEBUG("%ld bytes read from scull", count);
 
 	return retval;
 }
@@ -146,14 +149,12 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = -ENOMEM;
 
-//	printk(KERN_ALERT "start write\n"); // debug
-
-
 	item = (long)*f_pos / itemsize;
 	rest = (long)*f_pos % itemsize;
 	s_pos = rest / quantum; q_pos = rest % quantum;
 
 	dptr = scull_follow(dev, item);
+//	PDEBUG("item %d\n", item);
 	if (dptr == NULL)
 		goto out;
 	if (!dptr->data) {

@@ -2,21 +2,23 @@
 #include <stdlib.h> // atoi()
 #include <string.h> // memset(), strlen()
 
+#define QUANTUM 10
+#define BUFSIZE 1024*1024
+
 // open()
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include <unistd.h>
+#include <unistd.h> // read(), write()
 
 int main(int argc, char **argv)
 {
-	char buf[1024];
-	int fd;
+	char buf[BUFSIZE];
+	int fd, count, s_pos, f_pos, rest;
 
 	// buf initialize
-	memset(buf, '_', 1023);
-	buf[1023] = '\0';
+	memset(buf, 0, 1024*1024);
 
 	fd = open("/dev/scull0", O_RDWR);
 	if(fd == -1)
@@ -29,29 +31,45 @@ int main(int argc, char **argv)
 
 	switch(argv[1][1]){
 		case 'r':
-			read(fd, buf, atoi(argv[2]));
+			count = atoi(argv[2]);
+			if(count <= 0) break;
+
+			s_pos=0;
+			f_pos=0;
+			while(1) {
+				rest = count - f_pos;
+				if(rest > QUANTUM) {
+					read(fd, buf + s_pos*QUANTUM, QUANTUM);
+					s_pos++;
+					f_pos += QUANTUM;
+				} else {
+					read(fd, buf + s_pos*QUANTUM, rest);
+					break;
+				}
+			}
+
+			memset(buf+count, 0, BUFSIZE-count);
 			printf("%s\n", buf);
 
 			break;
 		case 'w':
-			if(!argv[2]) return 0;
-			write(fd, argv[2], strlen(argv[2]));
+			count = strlen(argv[2]);
+			if(count <= 0) break;
 
+			s_pos=0;
+			f_pos=0;
+			while(1) {
+				rest = count - f_pos;
+				if(rest > QUANTUM) {
+					write(fd, argv[2] + s_pos*QUANTUM, QUANTUM);
+					s_pos++;
+					f_pos += QUANTUM;
+				} else {
+					write(fd, argv[2] + s_pos*QUANTUM, rest);
+					break;
+				}
+			}
 			break;
-		case 'h':
-			printf(	"NAME\n"
-				"\t test /dev/scull\n"
-
-				"SYNOPSIS\n"
-				"\t test -r COUNT\n"
-				"\t test -w STRING COUNT\n"
-
-				"DESCRIPTION\n"
-				"\t-r COUNT \n"
-				"\t\tCOUNT bytes will be read.\n"
-				"\t-w STRING COUNT\n"
-				"\t\tThe STRING will be write into scull"
-			);
 		default:
 			printf("error args\n");
 			break;
