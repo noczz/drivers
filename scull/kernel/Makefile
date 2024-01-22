@@ -1,5 +1,17 @@
-ifneq ($(KERNELRELEASE),)
+# debug
+DEBUG = y
+
+ifeq ($(DEBUG),y)
+	DEBFLAGS = -O -g -DSCULL_DEBUG
+else
+	DEBFLAGS = -O2
+endif
+
+EXTRA_CFLAGS += $(DEBFLAGS)
+
+
 # call from kernel build system
+ifneq ($(KERNELRELEASE),)
 
 scull-objs := main.o
 

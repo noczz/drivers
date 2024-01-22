@@ -1,6 +1,7 @@
 module="scull"
 device="scull"
 
-make
+make || exit 1
 rmmod $module
 insmod $module.ko
+make clean
