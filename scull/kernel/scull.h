@@ -5,11 +5,11 @@
 
 #ifdef SCULL_DEBUG
 #  ifdef __KERNEL__
-/*
- * #    define PDEBUG(fmt, args...) printk( KERN_DEBUG "[ scull ] " \
- *       "( file %s line %d func %s )" fmt, __FILE__, __LINE__, __func__, ##args)
- */
-#    define PDEBUG(fmt, args...) printk(KERN_DEBUG "[ scull ] " fmt, ##args)
+
+#    define PDEBUG(fmt, args...) printk( KERN_DEBUG "[ scull ] " \
+		"%s:%d@%s()\n" fmt, __FILE__, __LINE__, __func__, ##args)
+
+//#    define PDEBUG(fmt, args...) printk(KERN_DEBUG "[ scull ] " fmt, ##args)
 #  else
 #    define PDEBUG(fmt, args...) fprintf(stderr, fmt, ##args)
 #  endif

@@ -30,6 +30,7 @@ struct scull_dev *scull_devices;
 
 static void *scull_seq_start(struct seq_file *s, loff_t *pos)
 {
+	PDEBUG("*pos %lld", *pos);
 	if (*pos >= scull_nr_devs)
 		return NULL;
 	return scull_devices += *pos;
@@ -37,6 +38,7 @@ static void *scull_seq_start(struct seq_file *s, loff_t *pos)
 
 static void *scull_seq_next(struct seq_file *s, void *v, loff_t *pos)
 {
+	PDEBUG("*pos %lld", *pos);
 	(*pos)++;
 	if(*pos >= scull_nr_devs)
 		return NULL;
