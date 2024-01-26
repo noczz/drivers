@@ -8,6 +8,12 @@
 #include <linux/fcntl.h> // O_ACCMODE
 #include <linux/uaccess.h> // copy_to_user(), copy_from_user()
 
+#include <linux/seq_file.h>
+/* struct seq_operations
+ * seq_open(), ...
+ */
+#include <linux/proc_fs.h> // proc_create()
+
 #include "scull.h"
 
 int scull_major = 0;
@@ -18,7 +24,86 @@ int scull_qset = 5;
 
 struct scull_dev *scull_devices;
 
-// Operations
+#ifdef SCULL_DEBUG
+
+// seq_file Operations
+
+static void *scull_seq_start(struct seq_file *s, loff_t *pos)
+{
+	if (*pos >= scull_nr_devs)
+		return NULL;
+	return scull_devices += *pos;
+}
+
+static void *scull_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+	(*pos)++;
+	if(*pos >= scull_nr_devs)
+		return NULL;
+	return scull_devices += *pos;
+}
+
+static void scull_seq_stop(struct seq_file *s, void *v)
+{
+	// do nothing
+}
+
+static int scull_seq_show(struct seq_file *s, void *v)
+{
+	struct scull_dev *dev = (struct scull_dev *) v;
+	struct scull_qset *d;
+	int i;
+	
+	seq_printf(s, "\nDevice %i: qset %i, quantum %i, size %li\n", // %i for decimal number
+		(int) (dev - scull_devices), dev->qset,
+		dev->quantum, dev->size);
+	for(d = dev->data; d; d = d->next) {
+		seq_printf(s, "  item at %p, qset at %p\n", d, d->data);
+
+	if (d->data && !d->next) /* dump only the last item */
+		for (i = 0; i < dev->qset; i++) {
+			if (d->data[i])
+				seq_printf(s, "    %4i: %8p\n",
+						i, d->data[i]);
+		}
+	}
+	return 0;
+}
+
+static struct seq_operations scull_seq_ops = {
+	.start = scull_seq_start,
+	.next  = scull_seq_next,
+	.stop  = scull_seq_stop,
+	.show  = scull_seq_show
+};
+
+static int scull_proc_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &scull_seq_ops);
+}
+
+static struct file_operations scull_proc_ops = {
+	.owner = THIS_MODULE,
+	.open = scull_proc_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release
+};
+
+static void scull_create_proc(void)
+{
+	proc_create("scullseq", 0, NULL, &scull_proc_ops);
+}
+
+static void scull_remove_proc(void)
+{
+	remove_proc_entry("scullseq", NULL);
+}
+
+#endif
+
+
+// scull Operations
 
 struct file_operations scull_fops = {
 	.owner =    THIS_MODULE,
@@ -155,10 +240,8 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 
 	dptr = scull_follow(dev, item);
 	if (dptr == NULL) {
-		PDEBUG("out\n");
 		goto out;
 	}
-	PDEBUG("not out\n");
 	if (!dptr->data) {
 		dptr->data = kmalloc(qset * sizeof(char *), GFP_KERNEL);
 		if (!dptr->data)
@@ -184,8 +267,8 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	if (dev->size < *f_pos)
 		dev->size = *f_pos;
 
-	PDEBUG("item %d s_pos %d q_pos %d count %ld dev->size %ld", 
-			item, s_pos, q_pos, count, dev->size);
+//	PDEBUG("item %d s_pos %d q_pos %d count %ld dev->size %ld", 
+//			item, s_pos, q_pos, count, dev->size);
   out:
 	return retval;
 }
@@ -216,6 +299,11 @@ void scull_cleanup_module(void)
 		}
 		kfree(scull_devices);
 	}
+
+#ifdef SCULL_DEBUG
+	scull_remove_proc();
+#endif
+
 	unregister_chrdev_region(devno, scull_nr_devs);
 }
 
@@ -251,8 +339,12 @@ int scull_init_module(void)
 		scull_devices[i].qset = scull_qset;
 		scull_setup_cdev(&scull_devices[i], i);
 	}
-	return 0;
 
+#ifdef SCULL_DEBUG
+	scull_create_proc();
+#endif
+
+	return 0;
 fail:
 	scull_cleanup_module();
 	return result;
