@@ -1,4 +1,0 @@
-	1. when enabled debug, the scull_unload will return fail. If do not
-	enable debug, everything will be fine.
-	2. the /proc/scullseq can not show scull3 information, and some
-	other information disappeared.

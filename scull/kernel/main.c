@@ -30,23 +30,24 @@ struct scull_dev *scull_devices;
 
 static void *scull_seq_start(struct seq_file *s, loff_t *pos)
 {
-	PDEBUG("*pos %lld", *pos);
+	PDEBUG("start\n");
 	if (*pos >= scull_nr_devs)
 		return NULL;
-	return scull_devices += *pos;
+	return scull_devices + *pos;
 }
 
 static void *scull_seq_next(struct seq_file *s, void *v, loff_t *pos)
 {
-	PDEBUG("*pos %lld", *pos);
+	PDEBUG("next\n");
 	(*pos)++;
 	if(*pos >= scull_nr_devs)
 		return NULL;
-	return scull_devices += *pos;
+	return scull_devices + *pos;
 }
 
 static void scull_seq_stop(struct seq_file *s, void *v)
 {
+	PDEBUG("stop\n");
 	// do nothing
 }
 
@@ -55,18 +56,22 @@ static int scull_seq_show(struct seq_file *s, void *v)
 	struct scull_dev *dev = (struct scull_dev *) v;
 	struct scull_qset *d;
 	int i;
-	
-	seq_printf(s, "\nDevice %i: qset %i, quantum %i, size %li\n", // %i for decimal number
-		(int) (dev - scull_devices), dev->qset,
-		dev->quantum, dev->size);
+
+	PDEBUG("show\n");
+	// %i for decimal number
+	seq_printf(s, "\nDevice%i: qset_size %i, quantum_size %i, device_size %li\n",
+			(int) (dev - scull_devices), dev->qset,
+			dev->quantum, dev->size);
 	for(d = dev->data; d; d = d->next) {
 		seq_printf(s, "  item at %p, qset at %p\n", d, d->data);
 
-	if (d->data && !d->next) /* dump only the last item */
-		for (i = 0; i < dev->qset; i++) {
-			if (d->data[i])
-				seq_printf(s, "    %4i: %8p\n",
-						i, d->data[i]);
+		if (d->data && !d->next) {
+			seq_printf(s, "  quantums of last qset:\n");
+			for (i = 0; i < dev->qset; i++) {
+				if (d->data[i])
+					seq_printf(s, "  quantum%i at %p\n",
+							i, d->data[i]);
+			}
 		}
 	}
 	return 0;
