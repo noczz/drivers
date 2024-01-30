@@ -1,4 +1,5 @@
 #include <linux/module.h> // module_init(), module_exit()
+#include <linux/moduleparam.h> // module_param()
 #include <linux/slab.h> // kmalloc()
 #include <linux/string.h> // memset()
 #include <linux/cdev.h> // MKDEV(), struct inode, struct file_operations,
@@ -16,11 +17,18 @@
 
 #include "scull.h"
 
-int scull_major = 0;
-int scull_minor = 0;
-int scull_nr_devs = 4;
-int scull_quantum = 10;
-int scull_qset = 5;
+MODULE_LICENSE("Dual BSD/GPL");
+
+int scull_major = SCULL_MAJOR;
+int scull_minor = SCULL_MINOR;
+int scull_nr_devs = SCULL_NR_DEVS;
+int scull_quantum = SCULL_QUANTUM;
+int scull_qset = SCULL_QSET;
+
+module_param(scull_major, int, S_IRUGO);
+module_param(scull_minor, int, S_IRUGO);
+module_param(scull_quantum, int, S_IRUGO);
+module_param(scull_qset, int, S_IRUGO);
 
 struct scull_dev *scull_devices;
 

@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 	// buf initialize
 	memset(buf, 0, 1024*1024);
 
-	fd = open("/dev/scull0", O_RDWR);
+	fd = open(argv[3], O_RDWR);
 	if(fd == -1)
 		printf("open error\n");
 

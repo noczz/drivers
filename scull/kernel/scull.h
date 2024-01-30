@@ -17,6 +17,13 @@
 #  define PDEBUG(fmt, args...)
 #endif
 
+// scull parameters
+#define SCULL_MAJOR 0
+#define SCULL_MINOR 0
+#define SCULL_NR_DEVS 4
+#define SCULL_QUANTUM 10
+#define SCULL_QSET 5
+
 struct scull_qset {
 	void **data;
 	struct scull_qset *next;
