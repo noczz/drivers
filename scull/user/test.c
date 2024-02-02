@@ -2,7 +2,8 @@
 #include <stdlib.h> // atoi()
 #include <string.h> // memset(), strlen()
 
-#define QUANTUM 10
+#define QUANTUM 5 // set equal to quantum_size in /proc/scullseq
+
 #define BUFSIZE 1024*1024
 
 // open()
@@ -18,7 +19,7 @@ int main(int argc, char **argv)
 	int fd, count, s_pos, f_pos, rest;
 
 	// buf initialize
-	memset(buf, 0, 1024*1024);
+	memset(buf, 0, BUFSIZE);
 
 	fd = open(argv[3], O_RDWR);
 	if(fd == -1)

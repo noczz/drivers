@@ -19,6 +19,7 @@
 
 MODULE_LICENSE("Dual BSD/GPL");
 
+
 int scull_major = SCULL_MAJOR;
 int scull_minor = SCULL_MINOR;
 int scull_nr_devs = SCULL_NR_DEVS;
