@@ -35,6 +35,7 @@ struct scull_dev {
 	int qset;
 	unsigned long size;
 	struct cdev cdev;
+	struct mutex lock;
 };
 
 int scull_open(struct inode *inode, struct file *filp);

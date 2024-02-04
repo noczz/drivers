@@ -66,6 +66,9 @@ static int scull_seq_show(struct seq_file *s, void *v)
 	struct scull_qset *d;
 	int i;
 
+	if(mutex_lock_interruptible(&dev->lock))
+		return -ERESTARTSYS;
+
 	PDEBUG("show\n");
 	// %i for decimal number
 	seq_printf(s, "\nDevice%i: qset_size %i, quantum_size %i, device_size %li\n",
@@ -83,6 +86,7 @@ static int scull_seq_show(struct seq_file *s, void *v)
 			}
 		}
 	}
+	mutex_unlock(&dev->lock);
 	return 0;
 }
 
@@ -161,7 +165,10 @@ int scull_open(struct inode *inode, struct file *filp)
 	filp->private_data = dev;
 
 	if((filp->f_flags & O_ACCMODE) == O_WRONLY) {
+		if(mutex_lock_interruptible(&dev->lock))
+			return -ERESTARTSYS;
 		scull_trim(dev);
+		mutex_unlock(&dev->lock);
 	}
 	return 0;
 }
@@ -207,6 +214,8 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = 0;
 
+	if(mutex_lock_interruptible(&dev->lock))
+		return -ERESTARTSYS;
 
 	if (*f_pos >= dev->size)
 		goto out;
@@ -236,7 +245,7 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count,
 	retval = count;
 
   out:
-
+	mutex_unlock(&dev->lock);
 	return retval;
 }
 
@@ -249,6 +258,9 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	int itemsize = quantum * qset;
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = -ENOMEM;
+
+	if(mutex_lock_interruptible(&dev->lock))
+		return -ERESTARTSYS;
 
 	item = (long)*f_pos / itemsize;
 	rest = (long)*f_pos % itemsize;
@@ -286,6 +298,7 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 //	PDEBUG("item %d s_pos %d q_pos %d count %ld dev->size %ld", 
 //			item, s_pos, q_pos, count, dev->size);
   out:
+	mutex_unlock(&dev->lock);
 	return retval;
 }
 
@@ -353,6 +366,7 @@ int scull_init_module(void)
 	for(i = 0; i < scull_nr_devs; i++) {
 		scull_devices[i].quantum = scull_quantum;
 		scull_devices[i].qset = scull_qset;
+		mutex_init(&scull_devices[i].lock);
 		scull_setup_cdev(&scull_devices[i], i);
 	}
 
