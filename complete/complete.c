@@ -37,7 +37,7 @@ ssize_t cmplt_read(struct file *filp, char __user *buf, size_t count,
 {
 	printk(KERN_DEBUG "process %i (%s) going to sleep\n",
 			current->pid, current->comm);
-//	wait_for_completion(&comp);
+	wait_for_completion(&comp);
 	printk(KERN_DEBUG "awoken %i (%s)\n", current->pid, current->comm);
 
 	return 0;
@@ -48,7 +48,7 @@ ssize_t cmplt_write(struct file *filp, const char __user *buf,
 {
 	printk(KERN_DEBUG "process %i (%s) awakening the readers...\n",
 			current->pid, current->comm);
-//	complete(&comp);
+	complete(&comp);
 	return count;
 }
 
