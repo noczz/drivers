@@ -4,7 +4,7 @@
 #include <linux/string.h> // memset()
 #include <linux/cdev.h> // MKDEV(), struct inode, struct file_operations,
 #include <linux/fs.h> // register_chrdev_region(), alloc_chrdev_region()
-#include <linux/errno.h> // EFAULT, ENOMEM
+#include <linux/errno.h> // EFAULT, ENOMEM, ... path: /usr/include/asm-generic/errno-base.h
 #include <linux/types.h> // size_t
 #include <linux/fcntl.h> // O_ACCMODE
 #include <linux/uaccess.h> // copy_to_user(), copy_from_user()
@@ -15,6 +15,7 @@
  */
 #include <linux/proc_fs.h> // proc_create()
 
+#include "access_ok_version.h"
 #include "scull.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
@@ -39,7 +40,6 @@ struct scull_dev *scull_devices;
 
 static void *scull_seq_start(struct seq_file *s, loff_t *pos)
 {
-	PDEBUG("start\n");
 	if (*pos >= scull_nr_devs)
 		return NULL;
 	return scull_devices + *pos;
@@ -47,7 +47,6 @@ static void *scull_seq_start(struct seq_file *s, loff_t *pos)
 
 static void *scull_seq_next(struct seq_file *s, void *v, loff_t *pos)
 {
-	PDEBUG("next\n");
 	(*pos)++;
 	if(*pos >= scull_nr_devs)
 		return NULL;
@@ -56,7 +55,6 @@ static void *scull_seq_next(struct seq_file *s, void *v, loff_t *pos)
 
 static void scull_seq_stop(struct seq_file *s, void *v)
 {
-	PDEBUG("stop\n");
 	// do nothing
 }
 
@@ -69,7 +67,6 @@ static int scull_seq_show(struct seq_file *s, void *v)
 	if(mutex_lock_interruptible(&dev->lock))
 		return -ERESTARTSYS;
 
-	PDEBUG("show\n");
 	// %i for decimal number
 	seq_printf(s, "\nDevice%i: qset_size %i, quantum_size %i, device_size %li\n",
 			(int) (dev - scull_devices), dev->qset,
@@ -103,10 +100,10 @@ static int scull_proc_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations scull_proc_ops = {
-	.owner = THIS_MODULE,
-	.open = scull_proc_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
+	.owner   = THIS_MODULE,
+	.open    = scull_proc_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
 	.release = seq_release
 };
 
@@ -126,11 +123,12 @@ static void scull_remove_proc(void)
 // scull Operations
 
 struct file_operations scull_fops = {
-	.owner =    THIS_MODULE,
-	.open =     scull_open,
-	.release =  scull_release,
-	.read =     scull_read,
-	.write =    scull_write,
+	.owner	         = THIS_MODULE,
+	.open	         = scull_open,
+	.release         = scull_release,
+	.read	         = scull_read,
+	.write	         = scull_write,
+	.unlocked_ioctl	 = scull_ioctl,
 };
 
 int scull_trim(struct scull_dev *dev)
@@ -295,10 +293,111 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	if (dev->size < *f_pos)
 		dev->size = *f_pos;
 
-//	PDEBUG("item %d s_pos %d q_pos %d count %ld dev->size %ld", 
-//			item, s_pos, q_pos, count, dev->size);
+	PDEBUG("item %d s_pos %d q_pos %d count %ld dev->size %ld", 
+			item, s_pos, q_pos, count, dev->size);
   out:
 	mutex_unlock(&dev->lock);
+	return retval;
+}
+
+long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	int err = 0, tmp;
+	int retval = 0;
+
+	PDEBUG("scull_ioctl\n");
+	if(_IOC_TYPE(cmd) != SCULL_IOC_MAGIC) return -ENOTTY;
+	if(_IOC_NR(cmd) > SCULL_IOC_MAXNR) return -ENOTTY;
+
+	if(_IOC_DIR(cmd) & _IOC_READ)
+		err = !access_ok_wrapper(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+	else if(_IOC_DIR(cmd) & _IOC_WRITE)
+		err = !access_ok_wrapper(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+	if(err) return -EFAULT;
+
+	PDEBUG("switch\n");
+	switch(cmd) {
+		case SCULL_IOCRESET:
+			scull_quantum = SCULL_QUANTUM;
+			scull_qset = SCULL_QSET;
+			break;
+
+		case SCULL_IOCSQUANTUM:
+			if(!capable(CAP_SYS_ADMIN)) {
+				PDEBUG();
+				return -EPERM;
+			}
+			PDEBUG();
+			retval = __get_user(scull_quantum, (int __user *)arg);
+			break;
+
+		case SCULL_IOCTQUANTUM:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EPERM;
+			scull_quantum = arg;
+			break;
+
+		case SCULL_IOCGQUANTUM:
+			retval = __put_user(scull_quantum, (int __user *)arg);
+			break;
+
+		case SCULL_IOCQQUANTUM:
+			return scull_quantum;
+
+		case SCULL_IOCXQUANTUM:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EPERM;
+			tmp = scull_quantum;
+			retval = __get_user(scull_quantum, (int __user *)arg);
+			if(retval == 0)
+				retval = __put_user(tmp, (int __user *)arg);
+			break;
+
+		case SCULL_IOCHQUANTUM:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EPERM;
+			tmp = scull_quantum;
+			scull_quantum = arg;
+			return tmp;
+
+		case SCULL_IOCSQSET:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EPERM;
+			retval = __get_user(scull_qset, (int __user *)arg);
+			break;
+
+		case SCULL_IOCTQSET:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EPERM;
+			scull_qset = arg;
+			break;
+
+		case SCULL_IOCGQSET:
+			retval = __put_user(scull_qset, (int __user *)arg);
+			break;
+
+		case SCULL_IOCQQSET:
+			return scull_qset;
+
+		case SCULL_IOCXQSET:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EPERM;
+			tmp = scull_qset;
+			retval = __get_user(scull_qset, (int __user *)arg);
+			if(retval == 0)
+				retval = put_user(tmp, (int __user *)arg);
+			break;
+
+		case SCULL_IOCHQSET:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EPERM;
+			tmp = scull_qset;
+			scull_qset = arg;
+			return tmp;
+
+		default:
+			return -ENOTTY;
+	}
 	return retval;
 }
 

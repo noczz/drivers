@@ -7,7 +7,10 @@ else
 	DEBFLAGS = -O2
 endif
 
+INCLUDES = -I$(PWD)/include
+
 EXTRA_CFLAGS += $(DEBFLAGS)
+EXTRA_CFLAGS += $(INCLUDES)
 
 
 # call from kernel build system
