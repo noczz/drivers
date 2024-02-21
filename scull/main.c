@@ -9,6 +9,8 @@
 #include <linux/fcntl.h> // O_ACCMODE
 #include <linux/uaccess.h> // copy_to_user(), copy_from_user()
 
+#include <linux/version.h> // LINUX_VERSION_CODE, KERNEL_VERSION()
+
 #include <linux/seq_file.h>
 /* struct seq_operations
  * seq_open(), ...
@@ -99,13 +101,26 @@ static int scull_proc_open(struct inode *inode, struct file *file)
 	return seq_open(file, &scull_seq_ops);
 }
 
-static struct file_operations scull_proc_ops = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+
+static const struct proc_ops scull_proc_ops = {
+	.proc_open    = scull_proc_open,
+	.proc_read    = seq_read,
+	.proc_lseek  = seq_lseek,
+	.proc_release = seq_release
+};
+
+#else
+
+static const struct file_operations scull_proc_ops = {
 	.owner   = THIS_MODULE,
 	.open    = scull_proc_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
 	.release = seq_release
 };
+
+#endif
 
 static void scull_create_proc(void)
 {
@@ -232,8 +247,8 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count,
 	if (count > quantum - q_pos)
 		count = quantum - q_pos;
 
-	PDEBUG("dev->size %lu f_pos %lld\n", dev->size, *f_pos);
-	PDEBUG("s_pos %d q_pos %d count %ld", s_pos, q_pos , count);
+	PDEBUG("dev->size %lu f_pos %lld s_pos %d q_pos %d count %lu",
+			dev->size, *f_pos, s_pos, q_pos , count);
 
 	if (copy_to_user(buf, dptr->data[s_pos] + q_pos, count)) {
 		retval = -EFAULT;
@@ -257,8 +272,8 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = -ENOMEM;
 
-	if(mutex_lock_interruptible(&dev->lock))
-		return -ERESTARTSYS;
+//	if(mutex_lock_interruptible(&dev->lock))
+//		return -ERESTARTSYS;
 
 	item = (long)*f_pos / itemsize;
 	rest = (long)*f_pos % itemsize;
@@ -293,10 +308,10 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	if (dev->size < *f_pos)
 		dev->size = *f_pos;
 
-	PDEBUG("item %d s_pos %d q_pos %d count %ld dev->size %ld", 
-			item, s_pos, q_pos, count, dev->size);
+	PDEBUG("dev->size %lu item %d s_pos %d q_pos %d count %lu\n", 
+			dev->size, item, s_pos, q_pos, count);
   out:
-	mutex_unlock(&dev->lock);
+//	mutex_unlock(&dev->lock);
 	return retval;
 }
 
@@ -305,7 +320,6 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	int err = 0, tmp;
 	int retval = 0;
 
-	PDEBUG("scull_ioctl\n");
 	if(_IOC_TYPE(cmd) != SCULL_IOC_MAGIC) return -ENOTTY;
 	if(_IOC_NR(cmd) > SCULL_IOC_MAXNR) return -ENOTTY;
 
@@ -315,7 +329,6 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		err = !access_ok_wrapper(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
 	if(err) return -EFAULT;
 
-	PDEBUG("switch\n");
 	switch(cmd) {
 		case SCULL_IOCRESET:
 			scull_quantum = SCULL_QUANTUM;
@@ -324,10 +337,8 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		case SCULL_IOCSQUANTUM:
 			if(!capable(CAP_SYS_ADMIN)) {
-				PDEBUG();
 				return -EPERM;
 			}
-			PDEBUG();
 			retval = __get_user(scull_quantum, (int __user *)arg);
 			break;
 
@@ -335,6 +346,7 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			if(!capable(CAP_SYS_ADMIN))
 				return -EPERM;
 			scull_quantum = arg;
+			PDEBUG("scull_quantum = %d", scull_quantum);
 			break;
 
 		case SCULL_IOCGQUANTUM:
