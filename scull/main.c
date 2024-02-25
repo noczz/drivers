@@ -2,7 +2,7 @@
 #include <linux/moduleparam.h> // module_param()
 #include <linux/slab.h> // kmalloc()
 #include <linux/string.h> // memset()
-#include <linux/cdev.h> // MKDEV(), struct inode, struct file_operations,
+#include <linux/cdev.h> // MKDEV(), struct inode, struct file_operations, dev_t
 #include <linux/fs.h> // register_chrdev_region(), alloc_chrdev_region()
 #include <linux/errno.h> // EFAULT, ENOMEM, ... path: /usr/include/asm-generic/errno-base.h
 #include <linux/types.h> // size_t
@@ -272,8 +272,8 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = -ENOMEM;
 
-//	if(mutex_lock_interruptible(&dev->lock))
-//		return -ERESTARTSYS;
+	if(mutex_lock_interruptible(&dev->lock))
+		return -ERESTARTSYS;
 
 	item = (long)*f_pos / itemsize;
 	rest = (long)*f_pos % itemsize;
@@ -311,7 +311,7 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
 	PDEBUG("dev->size %lu item %d s_pos %d q_pos %d count %lu\n", 
 			dev->size, item, s_pos, q_pos, count);
   out:
-//	mutex_unlock(&dev->lock);
+	mutex_unlock(&dev->lock);
 	return retval;
 }
 
