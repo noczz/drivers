@@ -11,6 +11,7 @@
 #include <sys/types.h>
 
 #define BUFSIZE 10
+#define ms 1000
 
 static int idata = 111;
 
@@ -30,7 +31,7 @@ void son(void) {
 
 	printf("(son) start writting\n");
 	for(i = 0; i < 100; i++) {
-		usleep(200000);
+		usleep(200*ms);
 		write(fd, buf, BUFSIZE);
 	}
 	printf("(son) written done\n");
@@ -61,7 +62,7 @@ void parent(void) {
 
 	printf("(parent) start writting\n");
 	for(i = 0; i < 100; i++) {
-		usleep(100000);
+		usleep(100*ms);
 		write(fd, buf, BUFSIZE);
 	}
 	printf("(parent) written done\n");
@@ -75,8 +76,7 @@ void parent(void) {
 	return;
 }
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	int istack = 222;
 	pid_t childPid;

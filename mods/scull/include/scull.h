@@ -24,6 +24,13 @@
 #define SCULL_QUANTUM 10
 #define SCULL_QSET 5
 
+
+/*
+ * access.c and main.c share
+ */
+extern int scull_quantum;
+extern int scull_qset;
+
 struct scull_qset {
 	void **data;
 	struct scull_qset *next;
@@ -37,6 +44,11 @@ struct scull_dev {
 	struct cdev cdev;
 	struct mutex lock;
 };
+
+int     scull_access_init(dev_t dev);
+void    scull_access_cleanup(void);
+
+int scull_trim(struct scull_dev *dev);
 
 int scull_open(struct inode *inode, struct file *filp);
 int scull_release(struct inode *inode, struct file *filp);

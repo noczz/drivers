@@ -16,18 +16,18 @@ static dev_t scull_a_firstdev;
 // single-open
 
 static struct scull_dev scull_s_device;
-static atomic_t scull_s_availabe = ATOMIC_INIT(1);
+static atomic_t scull_s_available = ATOMIC_INIT(1);
 
 static int scull_s_open(struct inode *inode, struct file *filp)
 {
-	struct scull_dev *dev = &(scull_s_avilable);
+	struct scull_dev *dev = &scull_s_device;
 
-	if (! atomic_dec_and_test(&scull_s_availabe)) {
-		atomic_inc(&scull_s_availabe);
+	if (! atomic_dec_and_test(&scull_s_available)) {
+		atomic_inc(&scull_s_available);
 		return -EBUSY;
 	}
 
-	if ( (filp->f_flags & O_ACCMODE) == O_WRONLY)
+	if ((filp->f_flags & O_ACCMODE) == O_WRONLY)
 		scull_trim(dev);
 
 	filp->private_data = dev;
@@ -40,7 +40,7 @@ static int scull_s_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-struct file_operations scull_sngl_fops = {
+struct file_operations scull_s_fops = {
 	.owner = THIS_MODULE,
 	.read = scull_read,
 	.write = scull_write,
@@ -64,7 +64,7 @@ static int scull_u_open(struct inode *inode, struct file *filp)
 	if (scull_u_count &&
 			(scull_u_owner != current_uid().val) &&
 			(scull_u_owner != current_euid().val) &&
-			!capable(CAP_DAV_OVERRIDE)) {
+			!capable(CAP_DAC_OVERRIDE)) {
 		spin_unlock(&scull_u_lock);
 		return -EBUSY;
 	}
@@ -106,19 +106,19 @@ static uid_t scull_w_owner;
 static DECLARE_WAIT_QUEUE_HEAD(scull_w_wait);
 static DEFINE_SPINLOCK(scull_w_lock);
 
-static inline scull_w_available(void)
+static inline int scull_w_available(void)
 {
 	return scull_w_count == 0 ||
 		scull_w_owner == current_uid().val ||
 		scull_w_owner == current_euid().val ||
-		capable(CAP_DAV_OVERRIDE);
+		capable(CAP_DAC_OVERRIDE);
 }
 
 static int scull_w_open(struct inode *inode, struct file *filp)
 {
 	struct scull_dev *dev = &scull_w_device;
 	
-	spin_lock(&scull_write);
+	spin_lock(&scull_w_lock);
 	while(! scull_w_available()) {
 		spin_unlock(&scull_w_lock);
 		if (filp->f_flags & O_NONBLOCK) return -EAGAIN;
@@ -137,7 +137,7 @@ static int scull_w_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int scull_w_release(struct *inode, struct file *filp)
+static int scull_w_release(struct inode *inode, struct file *filp)
 {
 	int temp;
 
@@ -157,7 +157,7 @@ struct file_operations scull_w_fops = {
 	.write          = scull_write,
 	.unlocked_ioctl = scull_ioctl,
 	.open           = scull_w_open,
-	.release        = scull_u_release,
+	.release        = scull_w_release,
 };
 
 // cloned private device
@@ -166,7 +166,7 @@ struct scull_listitem {
 	struct scull_dev device;
 	dev_t key;
 	struct list_head list;
-}
+};
 
 static LIST_HEAD(scull_c_list);
 static DEFINE_SPINLOCK(scull_c_lock);
@@ -214,7 +214,7 @@ static int scull_c_open(struct inode *inode, struct file *filp)
 	spin_unlock(&scull_c_lock);
 
 	if (!dev)
-		return -ENOMEN;
+		return -ENOMEM;
 
 	if ( (filp->f_flags & O_ACCMODE) == O_WRONLY )
 		scull_trim(dev);
@@ -241,13 +241,13 @@ static struct scull_adev_info {
 	struct scull_dev *device;
 	struct file_operations *fops;
 } scull_access_devs[] = {
-	{"scullsingle", &scull_s_devcie, &scull_s_fops},
+	{"scullsingle", &scull_s_device, &scull_s_fops},
 	{"sculluid", &scull_u_device, &scull_u_fops},
 	{"scullwuid", &scull_w_device, &scull_w_fops},
 	{"scullpriv", &scull_c_device, &scull_c_fops}
 };
 
-#define SCULL_N_ADEVS 4
+#define ACCESS_NR_ADEVS 4
 
 static void scull_access_setup(dev_t devno, struct scull_adev_info *devinfo)
 {
@@ -259,40 +259,40 @@ static void scull_access_setup(dev_t devno, struct scull_adev_info *devinfo)
 	mutex_init(&dev->lock);
 
 	cdev_init(&dev->cdev, devinfo->fops);
-	kobject_set_name(&dev->cdev.kobj, devinfo->name); // ? kobject_put()
+	kobject_set_name(&dev->cdev.kobj, devinfo->name);
 	dev->cdev.owner = THIS_MODULE;
 	err = cdev_add(&dev->cdev, devno, 1);
 	if (err) {
-		printk(KERN_NOTICE "Error %d adding %s\n", err, devinfo->name);
-		kobject_put(&dev->cdev.kobj);
+		PDEBUG(KERN_NOTICE "Error %d adding %s\n", err, devinfo->name);
+		kobject_put(&dev->cdev.kobj);	// ? kobject_put()
 	} else
-		printk(KERN_NOTICE "%s registered at %x\n", devinfo->name, devno);
+//		PDEBUG(KERN_NOTICE "%s registered at %x\n", devinfo->name, devno);
 }
 
 int scull_access_init(dev_t firstdev)
 {
 	int result, i;
 
-	result = register_chrdev_region(firstdev, SCULL_N_ADEVS, "sculla");
+	result = register_chrdev_region(firstdev, ACCESS_NR_ADEVS, "sculla");
 	if (result < 0) {
-		printk(KERN_WARNING "sculla: device number registration failed\n");
+		PDEBUG(KERN_WARNING "sculla: device number registration failed\n");
 		return 0;
 	}
 	// where is alloc_chrdev_region() ?
 
 	scull_a_firstdev = firstdev;
 
-	for (i = 0; i < SCULL_N_ADEVS; i++)
+	for (i = 0; i < ACCESS_NR_ADEVS; i++)
 		scull_access_setup(firstdev + i, scull_access_devs + i);
 
-	return SCULL_N_ADEVS;
+	return ACCESS_NR_ADEVS;
 }
 
 void scull_access_cleanup(void)
 {
 	struct scull_listitem *lptr, *next;
 	int i;
-	for (i = 0; i < SCULL_N_ADEVS; i++) {
+	for (i = 0; i < ACCESS_NR_ADEVS; i++) {
 		struct scull_dev *dev = scull_access_devs[i].device;
 		cdev_del(&dev->cdev);
 		scull_trim(scull_access_devs[i].device);
@@ -300,10 +300,10 @@ void scull_access_cleanup(void)
 
 	list_for_each_entry_safe(lptr, next, &scull_c_list, list) {
 		list_del(&lptr->list);
-		scull_trim(&(lptr->device));
+		scull_trim(&lptr->device);
 		kfree(lptr);
 	}
 
-	unregister_chrdev_region(scull_a_firstdev, SCULL_N_ADEVS);
+	unregister_chrdev_region(scull_a_firstdev, ACCESS_NR_ADEVS);
 	return;
 }

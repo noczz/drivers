@@ -15,3 +15,4 @@ core
 modules.order
 *.symvers
 tags
+*.vim
