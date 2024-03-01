@@ -15,8 +15,7 @@
 
 int fd;
 
-static void *
-threadFunc(void *arg)
+static void * threadFunc(void *arg)
 {
 	char *buf = malloc(BUFSIZE);
 	int i;
@@ -31,8 +30,7 @@ threadFunc(void *arg)
 	return 0;
 }
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	pthread_t t1;
 	void *res;

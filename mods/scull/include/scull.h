@@ -9,7 +9,8 @@
 #    define PDEBUG(fmt, args...) printk( KERN_DEBUG "[ scull ] " \
 		"%s:%d %s():" fmt, __FILE__, __LINE__, __func__, ##args)
 
-//#    define PDEBUG(fmt, args...) printk(KERN_DEBUG "[ scull ] " fmt, ##args)
+//#    define PDEBUG(fmt, args...) printk(KERN_DEBUG "[ scull ] "
+//							fmt, ##args)
 #  else
 #    define PDEBUG(fmt, args...) fprintf(stderr, fmt, ##args)
 #  endif

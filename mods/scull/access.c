@@ -49,7 +49,18 @@ struct file_operations scull_s_fops = {
 	.release = scull_s_release,
 };
 
-// multiple-open
+/*
+ * scull_uid
+ *
+ * Discription:
+ * 	This device can be opened by the rules below:
+ * 		1. The numeber of users who have opened is 0
+ * 		2. If the first condition is not met, the user
+ * 		or effective user must be the owner. (The first
+ * 		user will be record as a owner)
+ * 		3. If the second condition is not met, the user
+ * 		must have the DAC capablity
+ */
 
 static struct scull_dev scull_u_device;
 static int scull_u_count;
@@ -61,10 +72,29 @@ static int scull_u_open(struct inode *inode, struct file *filp)
 	struct scull_dev *dev = &scull_u_device;
 
 	spin_lock(&scull_u_lock);
+	PDEBUG("uid %u euid %u\n",
+		current_uid().val, current_euid().val);
+	/*
+	 * UID is the ID of the user that executed the program.
+	 * EUID (Effective UID) is the user ID the process is executing.
+	 *
+	 * Usually both are equal, unless using a program with SetUID to for
+	 * example increase your privileges. A common case where UID and EUID
+	 * are different would be executing sudo. EUID and UID variables only
+	 * work on bash, not in dash (in Debian based distros as Ubuntu sh is
+	 * usually a symlink to dash). If you are running the script inter-
+	 * actively you might not have bash configured as your default shell
+	 */
 	if (scull_u_count &&
 			(scull_u_owner != current_uid().val) &&
 			(scull_u_owner != current_euid().val) &&
 			!capable(CAP_DAC_OVERRIDE)) {
+			/*
+			 *  CAP_DAC_OVERRIDE
+			 *  	Bypass file read, write, and execute
+			 *  	permission checks. (DAC is an abbreviation
+			 *  	of "discretionary access control".)
+			 */
 		spin_unlock(&scull_u_lock);
 		return -EBUSY;
 	}
@@ -98,7 +128,16 @@ struct file_operations scull_u_fops = {
 	.release        = scull_u_release,
 };
 
-// blocking-open
+/*
+ * scull_wuid
+ *
+ * Discription:
+ * 	This device can be opened by the rules below:
+ * 		1. The numeber of users who have opened is 0
+ * 		2. The user or effective user is the first
+ * 		(The first user will be record as a owner)
+ * 		3. The user who have the DAC capablity
+ */
 
 static struct scull_dev scull_w_device;
 static int scull_w_count;
@@ -266,7 +305,7 @@ static void scull_access_setup(dev_t devno, struct scull_adev_info *devinfo)
 		PDEBUG(KERN_NOTICE "Error %d adding %s\n", err, devinfo->name);
 		kobject_put(&dev->cdev.kobj);	// ? kobject_put()
 	} else
-//		PDEBUG(KERN_NOTICE "%s registered at %x\n", devinfo->name, devno);
+		PDEBUG(KERN_NOTICE "%s registered at %x\n", devinfo->name, devno);
 }
 
 int scull_access_init(dev_t firstdev)
