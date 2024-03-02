@@ -71,7 +71,7 @@ static int scull_seq_show(struct seq_file *s, void *v)
 		return -ERESTARTSYS;
 
 	// %i for decimal number
-	seq_printf(s,	"\nDevice%i: qset_size %i, quantum_size %i,"
+	seq_printf(s,	"\nscull%i: qset_size %i, quantum_size %i,"
 			"device_size %li\n", (int) (dev - scull_devices),
 			dev->qset, dev->quantum, dev->size);
 	for (d = dev->data; d; d = d->next) {

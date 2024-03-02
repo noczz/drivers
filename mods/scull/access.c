@@ -63,8 +63,8 @@ struct file_operations scull_s_fops = {
  */
 
 static struct scull_dev scull_u_device;
-static int scull_u_count;
-static uid_t scull_u_owner;
+static int scull_u_count = 0;	// initialize to 0 by default
+static uid_t scull_u_owner = 0;	// initialize to 0(root) by default
 static DEFINE_SPINLOCK(scull_u_lock);	// No header file referenced
 
 static int scull_u_open(struct inode *inode, struct file *filp)
@@ -72,29 +72,22 @@ static int scull_u_open(struct inode *inode, struct file *filp)
 	struct scull_dev *dev = &scull_u_device;
 
 	spin_lock(&scull_u_lock);
-	PDEBUG("uid %u euid %u\n",
-		current_uid().val, current_euid().val);
-	/*
-	 * UID is the ID of the user that executed the program.
-	 * EUID (Effective UID) is the user ID the process is executing.
-	 *
-	 * Usually both are equal, unless using a program with SetUID to for
-	 * example increase your privileges. A common case where UID and EUID
-	 * are different would be executing sudo. EUID and UID variables only
-	 * work on bash, not in dash (in Debian based distros as Ubuntu sh is
-	 * usually a symlink to dash). If you are running the script inter-
-	 * actively you might not have bash configured as your default shell
-	 */
+	PDEBUG("USER(%u, %d) try to open scull_uid\n", current_uid().val,
+							current_euid().val);
+	PDEBUG("count %d, owner %u, cap %d\n",
+		scull_u_count, scull_u_owner, capable(CAP_DAC_OVERRIDE));
 	if (scull_u_count &&
 			(scull_u_owner != current_uid().val) &&
 			(scull_u_owner != current_euid().val) &&
 			!capable(CAP_DAC_OVERRIDE)) {
-			/*
+			/**
 			 *  CAP_DAC_OVERRIDE
 			 *  	Bypass file read, write, and execute
 			 *  	permission checks. (DAC is an abbreviation
 			 *  	of "discretionary access control".)
 			 */
+			PDEBUG("USER(%u, %u) failed to open scull_uid\n",
+				current_uid().val, current_euid().val);
 		spin_unlock(&scull_u_lock);
 		return -EBUSY;
 	}
@@ -104,6 +97,9 @@ static int scull_u_open(struct inode *inode, struct file *filp)
 
 	scull_u_count++;
 	spin_unlock(&scull_u_lock);
+
+	PDEBUG("USER(%u, %u) opened scull_uid\n",
+		current_uid().val, current_euid().val);
 	
 	if ((filp->f_flags & O_ACCMODE) == O_WRONLY)
 		scull_trim(dev);
@@ -132,9 +128,12 @@ struct file_operations scull_u_fops = {
  * scull_wuid
  *
  * Discription:
- * 	This device can be opened by the rules below:
+ * 	The second user who don't have CAP_DAC_OVERRIDE, will
+ * 	be blocked. When the first (or owner) closed, he will
+ * 	be unblock. This device can be opened by the rules
+ * 	below:
  * 		1. The numeber of users who have opened is 0
- * 		2. The user or effective user is the first
+ * 		2. The user or effective user is the owner
  * 		(The first user will be record as a owner)
  * 		3. The user who have the DAC capablity
  */
@@ -157,10 +156,16 @@ static int scull_w_open(struct inode *inode, struct file *filp)
 {
 	struct scull_dev *dev = &scull_w_device;
 	
+	PDEBUG("USER(%u, %d) try to open scull_wuid\n", current_uid().val,
+							current_euid().val);
+	PDEBUG("count %d, owner %u, cap %d\n",
+		scull_u_count, scull_u_owner, capable(CAP_DAC_OVERRIDE));
 	spin_lock(&scull_w_lock);
-	while(! scull_w_available()) {
+	while (! scull_w_available()) {
 		spin_unlock(&scull_w_lock);
 		if (filp->f_flags & O_NONBLOCK) return -EAGAIN;
+		PDEBUG("USER(%u, %u) blocked\n",
+			current_uid().val, current_euid().val);
 		if (wait_event_interruptible(scull_w_wait, scull_w_available()))
 			return -ERESTARTSYS;
 		spin_lock(&scull_w_lock);
@@ -169,6 +174,9 @@ static int scull_w_open(struct inode *inode, struct file *filp)
 		scull_w_owner = current_uid().val; // grab first user
 	scull_w_count++;
 	spin_unlock(&scull_w_lock);
+
+	PDEBUG("USER(%u, %u) opened scull_wuid\n",
+		current_uid().val, current_euid().val);
 
 	if( (filp->f_flags & O_ACCMODE) == O_WRONLY)
 		scull_trim(dev);
@@ -302,10 +310,10 @@ static void scull_access_setup(dev_t devno, struct scull_adev_info *devinfo)
 	dev->cdev.owner = THIS_MODULE;
 	err = cdev_add(&dev->cdev, devno, 1);
 	if (err) {
-		PDEBUG(KERN_NOTICE "Error %d adding %s\n", err, devinfo->name);
+		PDEBUG("error %d adding %s\n", err, devinfo->name);
 		kobject_put(&dev->cdev.kobj);	// ? kobject_put()
 	} else
-		PDEBUG(KERN_NOTICE "%s registered at %x\n", devinfo->name, devno);
+		PDEBUG("%s registered at %X\n", devinfo->name, devno);
 }
 
 int scull_access_init(dev_t firstdev)
@@ -314,7 +322,7 @@ int scull_access_init(dev_t firstdev)
 
 	result = register_chrdev_region(firstdev, ACCESS_NR_ADEVS, "sculla");
 	if (result < 0) {
-		PDEBUG(KERN_WARNING "sculla: device number registration failed\n");
+		PDEBUG("device number registration failed\n");
 		return 0;
 	}
 	// where is alloc_chrdev_region() ?

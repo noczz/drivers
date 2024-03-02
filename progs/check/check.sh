@@ -7,6 +7,7 @@ devfiles=$(ls -l /dev/scull*)
 
 echo
 echo 'Hello'
+
 if [ -n "$devfiles" ]; then
 	echo 'Hello, I am scull0' > /dev/scull0
 	echo 'Herlo, I am scull1' > /dev/scull1
@@ -22,3 +23,7 @@ if [ -n "$devfiles" ]; then
 else
 	echo "/dev/scull* don't exist"
 fi
+
+echo
+echo 'cat /proc/scull_seq'
+cat /proc/scullseq

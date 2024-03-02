@@ -64,11 +64,11 @@ int main(int argc, char *argv[])
 			printf("error fork");
 			return EXIT_FAILURE;
 		case 0:
-			sleep(1);
-			son(fd);
+			parent(fd);
 			break;
 		default:
-			parent(fd);
+			sleep(1);
+			son(fd);
 			break;
 	}
 
