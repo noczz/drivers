@@ -207,7 +207,14 @@ struct file_operations scull_w_fops = {
 	.release        = scull_w_release,
 };
 
-// cloned private device
+/**
+ * scull_priv
+ *
+ * Discription:
+ * 	scull_priv is a private device for each tty.
+ * 	Note that you should use command "tty" to check
+ * 	which tty you have.
+ */
 
 struct scull_listitem {
 	struct scull_dev device;
@@ -215,16 +222,17 @@ struct scull_listitem {
 	struct list_head list;
 };
 
-static LIST_HEAD(scull_c_list);
-static DEFINE_SPINLOCK(scull_c_lock);
+static LIST_HEAD(scull_p_list);
+static DEFINE_SPINLOCK(scull_p_lock);
 
-static struct scull_dev scull_c_device;
+static struct scull_dev scull_p_device;
 
-static struct scull_dev *scull_c_lookfor_device(dev_t key)
+static struct scull_dev *scull_p_lookfor_device(dev_t key)
 {
 	struct scull_listitem *lptr;
 
-	list_for_each_entry(lptr, &scull_c_list, list) {
+	// list  is the scull_listitem.list 's name
+	list_for_each_entry(lptr, &scull_p_list, list) {
 		if (lptr->key == key)
 			return &(lptr->device);
 	}
@@ -238,12 +246,12 @@ static struct scull_dev *scull_c_lookfor_device(dev_t key)
 	scull_trim(&(lptr->device));
 	mutex_init(&lptr->device.lock);
 
-	list_add(&lptr->list, &scull_c_list);
+	list_add(&lptr->list, &scull_p_list);
 
 	return &(lptr->device);
 }
 
-static int scull_c_open(struct inode *inode, struct file *filp)
+static int scull_p_open(struct inode *inode, struct file *filp)
 {
 	struct scull_dev *dev;
 	dev_t key;
@@ -256,9 +264,9 @@ static int scull_c_open(struct inode *inode, struct file *filp)
 	// get the device number of the tty
 	key = tty_devnum(current->signal->tty);
 
-	spin_lock(&scull_c_lock);
-	dev = scull_c_lookfor_device(key);
-	spin_unlock(&scull_c_lock);
+	spin_lock(&scull_p_lock);
+	dev = scull_p_lookfor_device(key);
+	spin_unlock(&scull_p_lock);
 
 	if (!dev)
 		return -ENOMEM;
@@ -269,18 +277,18 @@ static int scull_c_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int scull_c_release(struct inode *inode, struct file *filp)
+static int scull_p_release(struct inode *inode, struct file *filp)
 {
 	return 0;
 }
 
-struct file_operations scull_c_fops = {
+struct file_operations scull_p_fops = {
 	.owner = THIS_MODULE,
 	.read = scull_read,
 	.write = scull_write,
 	.unlocked_ioctl = scull_ioctl,
-	.open = scull_c_open,
-	.release = scull_c_release,
+	.open = scull_p_open,
+	.release = scull_p_release,
 };
 
 static struct scull_adev_info {
@@ -288,10 +296,10 @@ static struct scull_adev_info {
 	struct scull_dev *device;
 	struct file_operations *fops;
 } scull_access_devs[] = {
-	{"scullsingle", &scull_s_device, &scull_s_fops},
-	{"sculluid", &scull_u_device, &scull_u_fops},
-	{"scullwuid", &scull_w_device, &scull_w_fops},
-	{"scullpriv", &scull_c_device, &scull_c_fops}
+	{"scull_single", &scull_s_device, &scull_s_fops},
+	{"scull_uid", &scull_u_device, &scull_u_fops},
+	{"scull_wuid", &scull_w_device, &scull_w_fops},
+	{"scull_priv", &scull_p_device, &scull_p_fops}
 };
 
 #define ACCESS_NR_ADEVS 4
@@ -345,7 +353,7 @@ void scull_access_cleanup(void)
 		scull_trim(scull_access_devs[i].device);
 	}
 
-	list_for_each_entry_safe(lptr, next, &scull_c_list, list) {
+	list_for_each_entry_safe(lptr, next, &scull_p_list, list) {
 		list_del(&lptr->list);
 		scull_trim(&lptr->device);
 		kfree(lptr);
