@@ -64,9 +64,8 @@ static int scull_seq_show(struct seq_file *s, void *v)
 		if (mutex_lock_interruptible(&dev->lock))
 			return -ERESTARTSYS;
 
-		seq_printf(s, "scull \t");
 		// %i for decimal number
-		seq_printf(s, "%s: qset %i, quantum %i, size %li\n",
+		seq_printf(s, "%s:\tqset %i \tquantum %i \tsize %li\n",
 				scull_access_devs[index].name,
 				dev->qset, dev->quantum, dev->size);
 		mutex_unlock(&dev->lock);
@@ -78,8 +77,7 @@ static int scull_seq_show(struct seq_file *s, void *v)
 		if (mutex_lock_interruptible(&dev->lock))
 			return -ERESTARTSYS;
 
-		seq_printf(s, "access \t");
-		seq_printf(s, "scull%d: qset %i, quantum %i, size %li\n",
+		seq_printf(s, "scull%i:\tqset %i \tquantum %i \tsize %li\n",
 				index, dev->qset, dev->quantum, dev->size);
 		mutex_unlock(&dev->lock);
 	}
