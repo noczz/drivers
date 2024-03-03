@@ -16,7 +16,7 @@ EXTRA_CFLAGS += $(INCLUDES)
 # call from kernel build system
 ifneq ($(KERNELRELEASE),)
 
-scull-objs := main.o access.o
+scull-objs := main.o access.o seq_file.o
 
 obj-m	:= scull.o
 

@@ -1,9 +1,9 @@
 #include <linux/module.h> // module_init(), module_exit()
 #include <linux/moduleparam.h> // module_param()
 #include <linux/slab.h> // kmalloc()
-#include <linux/string.h> // memset()
+#include <linux/fs.h> 	// register_chrdev_region(), alloc_chrdev_region()
 #include <linux/cdev.h> // MKDEV(), struct inode, struct file_operations, dev_t
-#include <linux/fs.h> // register_chrdev_region(), alloc_chrdev_region()
+#include <linux/string.h> // memset()
 // EFAULT, ENOMEM, ... path: /usr/include/asm-generic/errno-base.h
 #include <linux/errno.h>
 #include <linux/types.h> // size_t
@@ -11,12 +11,6 @@
 #include <linux/uaccess.h> // copy_to_user(), copy_from_user()
 
 #include <linux/version.h> // LINUX_VERSION_CODE, KERNEL_VERSION()
-
-#include <linux/seq_file.h>
-/* struct seq_operations
- * seq_open(), ...
- */
-#include <linux/proc_fs.h> // proc_create()
 
 #include "access_ok_version.h"
 #include "scull.h"
@@ -36,105 +30,6 @@ module_param(scull_quantum, int, S_IRUGO);
 module_param(scull_qset, int, S_IRUGO);
 
 struct scull_dev *scull_devices;
-
-#ifdef SCULL_DEBUG
-
-// seq_file Operations
-
-static void *scull_seq_start(struct seq_file *s, loff_t *pos)
-{
-	if (*pos >= scull_nr_devs)
-		return NULL;
-	return scull_devices + *pos;
-}
-
-static void *scull_seq_next(struct seq_file *s, void *v, loff_t *pos)
-{
-	(*pos)++;
-	if (*pos >= scull_nr_devs)
-		return NULL;
-	return scull_devices + *pos;
-}
-
-static void scull_seq_stop(struct seq_file *s, void *v)
-{
-	// do nothing
-}
-
-static int scull_seq_show(struct seq_file *s, void *v)
-{
-	struct scull_dev *dev = (struct scull_dev *) v;
-	struct scull_qset *d;
-	int i;
-
-	if (mutex_lock_interruptible(&dev->lock))
-		return -ERESTARTSYS;
-
-	// %i for decimal number
-	seq_printf(s,	"\nscull%i: qset_size %i, quantum_size %i,"
-			"device_size %li\n", (int) (dev - scull_devices),
-			dev->qset, dev->quantum, dev->size);
-	for (d = dev->data; d; d = d->next) {
-		seq_printf(s, "  item at %p, qset at %p\n", d, d->data);
-
-		if (d->data && !d->next) {
-			seq_printf(s, "  quantums of last qset:\n");
-			for (i = 0; i < dev->qset; i++) {
-				if (d->data[i])
-					seq_printf(s, "  quantum%i at %p\n",
-							i, d->data[i]);
-			}
-		}
-	}
-	mutex_unlock(&dev->lock);
-	return 0;
-}
-
-static struct seq_operations scull_seq_ops = {
-	.start = scull_seq_start,
-	.next  = scull_seq_next,
-	.stop  = scull_seq_stop,
-	.show  = scull_seq_show
-};
-
-static int scull_proc_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &scull_seq_ops);
-}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
-
-static const struct proc_ops scull_proc_ops = {
-	.proc_open    = scull_proc_open,
-	.proc_read    = seq_read,
-	.proc_lseek  = seq_lseek,
-	.proc_release = seq_release
-};
-
-#else
-
-static const struct file_operations scull_proc_ops = {
-	.owner   = THIS_MODULE,
-	.open    = scull_proc_open,
-	.read    = seq_read,
-	.llseek  = seq_lseek,
-	.release = seq_release
-};
-
-#endif
-
-static void scull_create_proc(void)
-{
-	proc_create("scullseq", 0, NULL, &scull_proc_ops);
-}
-
-static void scull_remove_proc(void)
-{
-	remove_proc_entry("scullseq", NULL);
-}
-
-#endif
-
 
 // scull Operations
 

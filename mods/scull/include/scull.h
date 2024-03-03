@@ -25,10 +25,11 @@
 #define SCULL_QUANTUM 10
 #define SCULL_QSET 5
 
-
-/*
- * access.c and main.c share
+/**
+ * Structures
  */
+
+// scull
 extern int scull_quantum;
 extern int scull_qset;
 
@@ -46,9 +47,17 @@ struct scull_dev {
 	struct mutex lock;
 };
 
-int     scull_access_init(dev_t dev);
-void    scull_access_cleanup(void);
+struct scull_adev_info {
+	char *name;
+	struct scull_dev *device;
+	struct file_operations *fops;
+};
 
+/**
+ * Prototypes
+ */
+
+// scull
 int scull_trim(struct scull_dev *dev);
 
 int scull_open(struct inode *inode, struct file *filp);
@@ -58,6 +67,13 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count,
 ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
                     loff_t *f_pos);
 long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
+
+int     scull_access_init(dev_t dev);
+void    scull_access_cleanup(void);
+
+// proc(seq)
+void scull_create_proc(void);
+void scull_remove_proc(void);
 
 // scull ioctl definitions
 #define SCULL_IOC_MAGIC 'k'

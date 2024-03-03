@@ -1,9 +1,8 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/cdev.h> // dev_t, struct file_operations,
 #include <linux/cred.h> // current_uid(), current_euid(), current
-#include <asm/atomic.h> // atomic_t, atomic_dec_and_test(), atomic_inc()
 #include <linux/fs.h> 	// register_chrdev_region(), alloc_chrdev_region()
+#include <asm/atomic.h> // atomic_t, atomic_dec_and_test(), atomic_inc()
 #include <linux/list.h> // LIST_HEAD, struct_list head
 #include <linux/tty.h> // tty_devnum()
 
@@ -11,7 +10,9 @@
 
 #include "scull.h"
 
-static dev_t scull_a_firstdev;
+#define ACCESS_NR_ADEVS 4
+
+int scull_a_nr_devs = ACCESS_NR_ADEVS;
 
 // single-open
 
@@ -48,6 +49,10 @@ struct file_operations scull_s_fops = {
 	.open = scull_s_open,
 	.release = scull_s_release,
 };
+
+
+
+
 
 /*
  * scull_uid
@@ -123,6 +128,10 @@ struct file_operations scull_u_fops = {
 	.open           = scull_u_open,
 	.release        = scull_u_release,
 };
+
+
+
+
 
 /*
  * scull_wuid
@@ -207,6 +216,10 @@ struct file_operations scull_w_fops = {
 	.release        = scull_w_release,
 };
 
+
+
+
+
 /**
  * scull_priv
  *
@@ -216,6 +229,8 @@ struct file_operations scull_w_fops = {
  * 	which tty you have.
  */
 
+static struct scull_dev scull_p_device;
+
 struct scull_listitem {
 	struct scull_dev device;
 	dev_t key;
@@ -224,8 +239,6 @@ struct scull_listitem {
 
 static LIST_HEAD(scull_p_list);
 static DEFINE_SPINLOCK(scull_p_lock);
-
-static struct scull_dev scull_p_device;
 
 static struct scull_dev *scull_p_lookfor_device(dev_t key)
 {
@@ -291,18 +304,22 @@ struct file_operations scull_p_fops = {
 	.release = scull_p_release,
 };
 
-static struct scull_adev_info {
-	char *name;
-	struct scull_dev *device;
-	struct file_operations *fops;
-} scull_access_devs[] = {
+
+
+
+
+/*
+ * access init and clean up
+ */
+
+static dev_t scull_a_firstdev;
+
+struct scull_adev_info scull_access_devs[] = {
 	{"scull_single", &scull_s_device, &scull_s_fops},
 	{"scull_uid", &scull_u_device, &scull_u_fops},
 	{"scull_wuid", &scull_w_device, &scull_w_fops},
 	{"scull_priv", &scull_p_device, &scull_p_fops}
 };
-
-#define ACCESS_NR_ADEVS 4
 
 static void scull_access_setup(dev_t devno, struct scull_adev_info *devinfo)
 {
@@ -328,7 +345,7 @@ int scull_access_init(dev_t firstdev)
 {
 	int result, i;
 
-	result = register_chrdev_region(firstdev, ACCESS_NR_ADEVS, "sculla");
+	result = register_chrdev_region(firstdev, scull_a_nr_devs, "sculla");
 	if (result < 0) {
 		PDEBUG("device number registration failed\n");
 		return 0;
@@ -337,17 +354,21 @@ int scull_access_init(dev_t firstdev)
 
 	scull_a_firstdev = firstdev;
 
-	for (i = 0; i < ACCESS_NR_ADEVS; i++)
+	for (i = 0; i < scull_a_nr_devs; i++)
 		scull_access_setup(firstdev + i, scull_access_devs + i);
 
-	return ACCESS_NR_ADEVS;
+#ifdef SCULL_DEBUG
+	scull_create_proc();
+#endif
+
+	return scull_a_nr_devs;
 }
 
 void scull_access_cleanup(void)
 {
 	struct scull_listitem *lptr, *next;
 	int i;
-	for (i = 0; i < ACCESS_NR_ADEVS; i++) {
+	for (i = 0; i < scull_a_nr_devs; i++) {
 		struct scull_dev *dev = scull_access_devs[i].device;
 		cdev_del(&dev->cdev);
 		scull_trim(scull_access_devs[i].device);
@@ -358,7 +379,10 @@ void scull_access_cleanup(void)
 		scull_trim(&lptr->device);
 		kfree(lptr);
 	}
+#ifdef SCULL_DEBUG
+	scull_remove_proc();
+#endif
 
-	unregister_chrdev_region(scull_a_firstdev, ACCESS_NR_ADEVS);
+	unregister_chrdev_region(scull_a_firstdev, scull_a_nr_devs);
 	return;
 }
