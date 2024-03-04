@@ -28,6 +28,10 @@ module_param(scull_major, int, S_IRUGO);
 module_param(scull_minor, int, S_IRUGO);
 module_param(scull_quantum, int, S_IRUGO);
 module_param(scull_qset, int, S_IRUGO);
+/*
+ * S_IRUGO overwrite rights of sys/module/scull/parameters/scull*
+ * R - Read, U - User, G - Group, O - Others
+ */
 
 struct scull_dev *scull_devices;
 
@@ -366,6 +370,7 @@ void scull_cleanup_module(void)
 
 	unregister_chrdev_region(devno, scull_nr_devs);
 	scull_access_cleanup();
+	scull_pipe_cleanup();
 }
 
 int scull_init_module(void)
@@ -406,7 +411,9 @@ int scull_init_module(void)
 	scull_create_proc();
 #endif
 
-	scull_access_init(dev + scull_nr_devs);
+	dev += scull_nr_devs;
+	dev += scull_access_init(dev);
+	scull_pipe_init(dev);
 	return 0;
 fail:
 

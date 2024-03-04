@@ -19,11 +19,15 @@
 #endif
 
 // scull parameters
+
 #define SCULL_MAJOR 0
 #define SCULL_MINOR 0
 #define SCULL_NR_DEVS 4
 #define SCULL_QUANTUM 10
 #define SCULL_QSET 5
+
+#define SCULL_P_NR_DEVS 4
+#define SCULL_P_BUFFER 100
 
 /**
  * Structures
@@ -68,8 +72,13 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count,
                     loff_t *f_pos);
 long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 
-int     scull_access_init(dev_t dev);
-void    scull_access_cleanup(void);
+// access
+int scull_access_init(dev_t dev);
+void scull_access_cleanup(void);
+
+// pipe
+int scull_pipe_init(dev_t firstdev);
+void scull_pipe_cleanup(void);
 
 // proc(seq)
 void scull_create_proc(void);

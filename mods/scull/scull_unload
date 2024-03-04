@@ -5,5 +5,4 @@ device="scull"
 
 rmmod $module $*
 
-rm -f /dev/${device} /dev/${device}[0-3] 
-rm -f /dev/${device}_*
+rm -f /dev/${device}*

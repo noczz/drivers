@@ -7,7 +7,7 @@ else
 	DEBFLAGS = -O2
 endif
 
-INCLUDES = -I$(PWD)/include
+INCLUDES = -I $(PWD)/include
 
 EXTRA_CFLAGS += $(DEBFLAGS)
 EXTRA_CFLAGS += $(INCLUDES)
@@ -16,7 +16,7 @@ EXTRA_CFLAGS += $(INCLUDES)
 # call from kernel build system
 ifneq ($(KERNELRELEASE),)
 
-scull-objs := main.o access.o seq_file.o
+scull-objs := main.o access.o seq_file.o pipe.o
 
 obj-m	:= scull.o
 
