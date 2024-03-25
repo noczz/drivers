@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #ifndef PROG_NAME
-	#define PROG_NAME "ANONYMOUS"
+	#define PROG_NAME arv[0]
 #endif
 
 #ifndef PROG_DEBUG

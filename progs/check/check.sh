@@ -22,8 +22,9 @@ if [ -n "$devfiles" ]; then
 	#echo 'Hello, I am scull_pip2' > /dev/scull_pipe2
 	#echo 'Hello, I am scull_pip3' > /dev/scull_pipe3
 	echo
-	echo 'cat /dev/scull*'
-	cat /dev/scull*
+	echo 'cat /dev/scull[0-3_][a-z][^i]*'
+	cat /dev/scull[0-3]
+	cat /dev/scull_*[^0-3]
 else
 	echo "/dev/scull* don't exist"
 fi

@@ -27,7 +27,7 @@
 #define SCULL_QSET 5
 
 #define SCULL_P_NR_DEVS 4
-#define SCULL_P_BUFFER 100
+#define SCULL_P_BUFFER 5
 
 /**
  * Structures

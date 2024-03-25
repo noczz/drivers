@@ -28,6 +28,7 @@
  */
 //#include <linux/wait.h>
 #include <linux/moduleparam.h>
+#include <linux/poll.h>
 
 #include "scull.h"
 
@@ -85,6 +86,8 @@ static int scull_p_open(struct inode *inode, struct file *filp)
 		dev->nwriters++;
 	mutex_unlock(&dev->lock);
 	
+	PDEBUG("buffer %pK\n", dev->buffer);
+
 	return nonseekable_open(inode, filp);
 	/* Ban lseek(), pread(), pwrite() */
 }
@@ -117,7 +120,6 @@ static int scull_p_release(struct inode *inode, struct file *filp)
 /**
  * Data management: read and write
  */
-
 static ssize_t scull_p_read(struct file *filp, char __user *buf, size_t count,
 		loff_t *f_pos)
 {
@@ -139,7 +141,7 @@ static ssize_t scull_p_read(struct file *filp, char __user *buf, size_t count,
 	if (dev->wp > dev->rp)
 		count = min(count, (size_t)(dev->wp - dev->rp));
 	else
-		count = min(count, (size_t)(dev->end - dev->wp));
+		count = min(count, (size_t)(dev->end - dev->rp));
 	if (copy_to_user(buf, dev->rp, count)) {
 		mutex_unlock(&dev->lock);
 		return -EFAULT;
@@ -150,7 +152,8 @@ static ssize_t scull_p_read(struct file *filp, char __user *buf, size_t count,
 	mutex_unlock(&dev->lock);
 
 	wake_up_interruptible(&dev->outq);
-	PDEBUG("\"%s\" did read %li bytes\n", current->comm, (long)count);
+	PDEBUG("\"%s\" did read %lu bytes\n", current->comm, count);
+	PDEBUG("buffer %pK wp %pK rp %pK\n", dev->buffer, dev->wp, dev->rp);
 	return count;
 }
 
@@ -208,7 +211,7 @@ static ssize_t scull_p_write(struct file *filp, const char __user *buf,
 		count = min(count, (size_t)(dev->end - dev->wp));
 	else
 		count = min(count, (size_t)(dev->rp - dev->wp -1));
-	PDEBUG("Going to accept %li bytes to %p from %p\n", (long)count,
+	PDEBUG("Going to accept %lu bytes to %pK from %pK\n", count,
 								dev->wp, buf);
 	if (copy_from_user(dev->wp, buf, count)) {
 		mutex_unlock(&dev->lock);
@@ -221,8 +224,31 @@ static ssize_t scull_p_write(struct file *filp, const char __user *buf,
 
 	wake_up_interruptible(&dev->inq);
 
-	PDEBUG("\"%s\" did write %li bytes\n", current->comm, (long)count);
+	PDEBUG("\"%s\" did write %lu bytes\n", current->comm, count);
+	PDEBUG("buffer %pK wp %pK rp %pK\n", dev->buffer, dev->wp, dev->rp);
 	return count;
+}
+
+/*
+ * poll
+ */
+
+static unsigned int scull_p_poll(struct file *filp, poll_table *wait)
+{
+	struct scull_pipe *dev = filp->private_data;
+	unsigned int mask = 0;
+
+	poll_wait(filp, &dev->inq, wait);
+	/*
+	 * Add &dev->inq to wait;
+	 */
+	poll_wait(filp, &dev->outq, wait);
+	if (dev->rp != dev->wp)
+		mask |= POLLIN | POLLRDNORM;
+	if (spacefree(dev))
+		mask |= POLLOUT | POLLWRNORM;
+	mutex_unlock(&dev->lock);
+	return mask;
 }
 
 /*
@@ -235,10 +261,8 @@ struct file_operations scull_pipe_fops = {
 	.open           = scull_p_open,
 	.release        = scull_p_release,
 	.read           = scull_p_read,
-	.write          = scull_p_write
-	/**
-	 * methods ...
-	 */
+	.write          = scull_p_write,
+	.poll           = scull_p_poll
 };
 
 
