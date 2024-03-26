@@ -38,7 +38,7 @@ struct scull_pipe {
 	int buffersize;
 	char *rp, *wp;
 	int nreaders, nwriters;
-//	struct fasync_struct *async_queue;
+	struct fasync_struct *async_queue;
 	struct mutex lock;
 	struct cdev cdev;
 };
@@ -78,42 +78,46 @@ static int scull_p_open(struct inode *inode, struct file *filp)
 	}
 	dev->buffersize = scull_p_buffer;
 	dev->end = dev->buffer + dev->buffersize;
-	dev->rp = dev->wp = dev->buffer;
+
+	if (dev->nreaders + dev->nwriters == 0)
+		dev->rp = dev->wp = dev->buffer;
 
 	if (filp->f_mode & FMODE_READ)
 		dev->nreaders++;
 	if (filp->f_mode & FMODE_WRITE)
 		dev->nwriters++;
+
+	PDEBUG("buffer %px\n", dev->buffer);
+	PDEBUG("nreaders %d, nwriters %d\n", dev->nreaders, dev->nwriters);
 	mutex_unlock(&dev->lock);
 	
-	PDEBUG("buffer %pK\n", dev->buffer);
 
 	return nonseekable_open(inode, filp);
 	/* Ban lseek(), pread(), pwrite() */
 }
 
-//static int scull_p_fasync(int fd, struct file *filp, int mode)
-//{
-//	struct scull_pipe *dev = filp->private_data;
-//
-//	return fasync_helper(fd, filp, mode, &dev->async_queue);
-//}
+static int scull_p_fasync(int fd, struct file *filp, int mode)
+{
+	struct scull_pipe *dev = filp->private_data;
+
+	return fasync_helper(fd, filp, mode, &dev->async_queue);
+}
 
 static int scull_p_release(struct inode *inode, struct file *filp)
 {
-//	struct scull_pipe *dev = filp->private_data;
+	struct scull_pipe *dev = filp->private_data;
 
-//	scull_p_fasync(-1, filp, 0);
-//	mutex_lock(&dev->lock);
-//	if (filp->f_mode & FMODE_READ)
-//		dev->nreaders --;
-//	if (filp->f_mode & FMODE_WRITE)
-//		dev->nwriters--;
-//	if (dev->nreaders + dev->nwriters == 0) {
-//		kfree(dev->buffer);
-//		dev->buffer = NULL;
-//	}
-//	mutex_unlock(&dev->lock);
+	scull_p_fasync(-1, filp, 0);
+	mutex_lock(&dev->lock);
+	if (filp->f_mode & FMODE_READ)
+		dev->nreaders --;
+	if (filp->f_mode & FMODE_WRITE)
+		dev->nwriters--;
+	if (dev->nreaders + dev->nwriters == 0) {
+		kfree(dev->buffer);
+		dev->buffer = NULL;
+	}
+	mutex_unlock(&dev->lock);
 	return 0;
 }
 
@@ -128,7 +132,7 @@ static ssize_t scull_p_read(struct file *filp, char __user *buf, size_t count,
 	if (mutex_lock_interruptible(&dev->lock))
 		return -ERESTARTSYS;
 
-	while(dev->rp == dev->wp) {
+	while (dev->rp == dev->wp) {
 		mutex_unlock(&dev->lock);
 		if (filp->f_flags & O_NONBLOCK)
 			return -EAGAIN;
@@ -149,11 +153,17 @@ static ssize_t scull_p_read(struct file *filp, char __user *buf, size_t count,
 	dev->rp += count;
 	if (dev->rp == dev->end)
 		dev->rp = dev->buffer;
+
+	/* When dev pointer accessed in unlocked, we will get NULL ptr */
+	PDEBUG("\"%s\" did read %lu bytes\n", current->comm, count);
+	PDEBUG("buffer %px wp %px rp %px\n", dev->buffer, dev->wp, dev->rp);
 	mutex_unlock(&dev->lock);
 
 	wake_up_interruptible(&dev->outq);
-	PDEBUG("\"%s\" did read %lu bytes\n", current->comm, count);
-	PDEBUG("buffer %pK wp %pK rp %pK\n", dev->buffer, dev->wp, dev->rp);
+
+	if (dev->async_queue)
+		kill_fasync(&dev->async_queue, SIGIO, POLL_OUT);
+
 	return count;
 }
 
@@ -211,7 +221,7 @@ static ssize_t scull_p_write(struct file *filp, const char __user *buf,
 		count = min(count, (size_t)(dev->end - dev->wp));
 	else
 		count = min(count, (size_t)(dev->rp - dev->wp -1));
-	PDEBUG("Going to accept %lu bytes to %pK from %pK\n", count,
+	PDEBUG("Going to accept %lu bytes to %px from %px\n", count,
 								dev->wp, buf);
 	if (copy_from_user(dev->wp, buf, count)) {
 		mutex_unlock(&dev->lock);
@@ -220,12 +230,17 @@ static ssize_t scull_p_write(struct file *filp, const char __user *buf,
 	dev->wp += count;
 	if (dev->wp == dev->end)
 		dev->wp = dev->buffer;
+
+	/* When dev pointer accessed in unlocked, we will get NULL ptr */
+	PDEBUG("\"%s\" did write %lu bytes\n", current->comm, count);
+	PDEBUG("buffer %px wp %px rp %px\n", dev->buffer, dev->wp, dev->rp);
 	mutex_unlock(&dev->lock);
 
 	wake_up_interruptible(&dev->inq);
 
-	PDEBUG("\"%s\" did write %lu bytes\n", current->comm, count);
-	PDEBUG("buffer %pK wp %pK rp %pK\n", dev->buffer, dev->wp, dev->rp);
+	if (dev->async_queue)
+		kill_fasync(&dev->async_queue, SIGIO, POLL_IN);
+
 	return count;
 }
 
@@ -262,7 +277,8 @@ struct file_operations scull_pipe_fops = {
 	.release        = scull_p_release,
 	.read           = scull_p_read,
 	.write          = scull_p_write,
-	.poll           = scull_p_poll
+	.poll           = scull_p_poll,
+	.fasync		= scull_p_fasync
 };
 
 

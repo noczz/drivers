@@ -48,7 +48,7 @@ mknod /dev/${device}_pipe0 c $major 8
 mknod /dev/${device}_pipe1 c $major 9
 mknod /dev/${device}_pipe2 c $major 10
 mknod /dev/${device}_pipe3 c $major 11
-chgrp $group /dev/${device}[8-11]
-chmod $mode /dev/${device}[8-11]
+chgrp $group /dev/${device}_pipe[0-3]
+chmod $mode /dev/${device}_pipe[0-3]
 
 make clean

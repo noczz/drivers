@@ -25,7 +25,7 @@ loff_t seq_pos;
 static void *scull_seq_start(struct seq_file *s, loff_t *pos)
 {
 	seq_pos = *pos;
-	PDEBUG("*seq_pos %lld\n", seq_pos);
+	PDEBUG("seq_pos %lld\n", seq_pos);
 	if (*pos >= scull_nr_devs + scull_a_nr_devs - 1)
 		return NULL;
 	else if (*pos >= scull_nr_devs)
@@ -69,8 +69,7 @@ static int scull_seq_show(struct seq_file *s, void *v)
 				scull_access_devs[index].name,
 				dev->qset, dev->quantum, dev->size);
 		mutex_unlock(&dev->lock);
-	}
-	else {
+	} else {
 		dev = (struct scull_dev *) v;
 		index = (int) (dev - scull_devices);
 

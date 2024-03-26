@@ -12,11 +12,12 @@
 #define PROG_NAME "pipe_read"
 #include "debug.h"
 
+const char devfile[] = "/dev/scull_pipe0";
+
 int main(int argc, char *argv[])
 {
-	int fd, err;
+	int fd, err, count = 0;
 	char buf[BUFSIZE];
-	char devfile[] = "/dev/scull_pipe0";
 
 	fd = open (devfile, O_RDWR);
 	if (fd == -1) {
@@ -24,19 +25,23 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (!read(fd, buf, 3)) {
-		DEBUG("read error\n");
-		return -1;
+	if (argc != 2)
+		printf("pipe-read count\n");
+	else {
+		count = atoi(argv[1]);
+		if (count == 0)
+			printf("%s: atoi error\n", argv[0]);
+		count = read(fd, buf, count);
+		if (count < 0) {
+			DEBUG("read error\n");
+			return -1;
+		}
 	}
 
-	sleep(5);
+	buf[count] = '\0';
 
-	if (!read(fd, buf+3, 3)) {
-		DEBUG("read error\n");
-		return -1;
-	}
-	buf[6] = '\0';
-	DEBUG("buf %s\n", buf);
+	printf("%s: read %d bytes from %s\n", argv[0], count, devfile);
+	printf("%s\n", buf);
 
 	close(fd);
 	return 0;

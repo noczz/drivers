@@ -358,10 +358,6 @@ int scull_access_init(dev_t firstdev)
 	for (i = 0; i < scull_a_nr_devs; i++)
 		scull_access_setup(firstdev + i, scull_access_devs + i);
 
-#ifdef SCULL_DEBUG
-	scull_create_proc();
-#endif
-
 	return scull_a_nr_devs;
 }
 
@@ -380,9 +376,6 @@ void scull_access_cleanup(void)
 		scull_trim(&lptr->device);
 		kfree(lptr);
 	}
-#ifdef SCULL_DEBUG
-	scull_remove_proc();
-#endif
 
 	unregister_chrdev_region(scull_a_firstdev, scull_a_nr_devs);
 	return;
