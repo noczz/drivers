@@ -1,23 +1,19 @@
-# debug
-DEBUG = y
-
-ifeq ($(DEBUG),y)
-	DEBFLAGS = -O -g -DSCULL_DEBUG
-else
-	DEBFLAGS = -O2
-endif
-
-INCLUDES = -I $(PWD)/include
-
-EXTRA_CFLAGS += $(DEBFLAGS)
-EXTRA_CFLAGS += $(INCLUDES)
-
 # call from kernel build system
 ifneq ($(KERNELRELEASE),)
+  DEBFLAGS = -O -g -DSCULL_DEBUG
+else
+  DEBFLAGS = -O2
+endif
 
-scull-objs := main.o access.o seq_file.o pipe.o
+#INCLUDE=$(PWD)/../include
 
-obj-m	:= scull.o
+EXTRA_CFLAGS += $(DEBFLAGS)
+EXTRA_CFLAGS += -I$(INCLUDE)
+
+ifneq ($(KERNELRELEASE),)
+
+#obj-m := tsc.o
+obj-m := jit.o
 
 else
 

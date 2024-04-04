@@ -194,8 +194,15 @@ static int scull_getwritespace(struct scull_pipe *dev, struct file *filp)
 			 * new reader to wake up it.
 			 */
 			schedule();
-		//if (signal_pending(current))
-		//	return -ERESTARTSYS;
+		/*
+		 * The call to signal_pending tells us whether we were
+		 * awakened by a signal; if so, we need to return to the
+		 * user and let them try again after signal handler run
+		 * out. Otherwise, we reacquire the semaphore, and test
+		 * for free space as usual.
+		 */
+		if (signal_pending(current))
+			return -ERESTARTSYS;
 		if (mutex_lock_interruptible(&dev->lock))
 			return -ERESTARTSYS;
 	}

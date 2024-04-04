@@ -4,7 +4,6 @@ module="scull"
 device="scull"
 mode="664"
 
-make
 insmod ./$module.ko $* || exit 1
 
 if grep -q '^staff:' /etc/group; then
