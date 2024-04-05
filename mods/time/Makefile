@@ -1,6 +1,6 @@
 # call from kernel build system
 ifneq ($(KERNELRELEASE),)
-  DEBFLAGS = -O -g -DSCULL_DEBUG
+  DEBFLAGS = -O -g -DDEBUG
 else
   DEBFLAGS = -O2
 endif
@@ -13,7 +13,7 @@ EXTRA_CFLAGS += -I$(INCLUDE)
 ifneq ($(KERNELRELEASE),)
 
 #obj-m := tsc.o
-obj-m := jit.o
+obj-m := jiq.o
 
 else
 

@@ -283,6 +283,8 @@ void jit_tasklet_fn(unsigned long arg)
 	} else {
 		wake_up_interruptible(&data->wait);
 	}
+
+	return;
 }
 
 int jit_tasklet_show(struct seq_file *s, void *v)

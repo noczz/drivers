@@ -6,13 +6,13 @@
 #ifdef SCULL_DEBUG
 #  ifdef __KERNEL__
 
-#    define PDEBUG(fmt, args...) printk( KERN_DEBUG "[ scull ] " \
-		"%s:%d %s(): " fmt, __FILE__, __LINE__, __func__, ##args)
-
-//#    define PDEBUG(fmt, args...) printk(KERN_DEBUG "[ scull ] "
+#    define PDEBUG(fmt, args...) printk( KERN_DEBUG "[ %s ] %s:%d %s() " \
+		fmt, THIS_MODULE->name, __FILE__, __LINE__, __func__, ##args)
+//#    define PDEBUG(fmt, args...) printk(KERN_DEBUG \
 //							fmt, ##args)
 #  else
-#    define PDEBUG(fmt, args...) fprintf(stderr, fmt, ##args)
+#    define PDEBUG(fmt, args...) printf("[ %s ] %s:%d %s() " \
+		fmt, argv[0], __FILE__, __LINE__, __func__, ##args)
 #  endif
 #else
 #  define PDEBUG(fmt, args...)
