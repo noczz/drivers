@@ -1,6 +1,5 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
-#include <linux/init.h>
 
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
@@ -25,7 +24,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 #  define PDEBUG(fmt, args...)
 #endif
 
-struct wait_queue_head jiq_wait;
+wait_queue_head_t jiq_wait;
 
 static struct clientdata {
 	struct work_struct jiq_work;
@@ -49,27 +48,25 @@ static int jiq_print(struct clientdata *data)
 	}
 
 	if (len == 0) {
-		seq_puts(s, "  time \tdelta \tpreempt "
-				"\tpid \tcpu \tcommand\n");
-		PDEBUG("s->count %lu", s->count);
+		seq_puts(s, "  time\t\t delta\t preempt pid\t cpu\t command\n");
 		len = s->count;
 	} else {
 		len = 0;
 	}
 
-	seq_printf(s, "  %ld \t%ld \t%d \t%d \t%d \t%s\n",
+	seq_printf(s, "  %ld\t %ld\t %d\t %d\t %d\t %s\n",
 			j, j - data->jiffies, preempt_count(),
 			current->pid, smp_processor_id(), current->comm);
 	len += s->count;
 
 	data->len += len;
+	PDEBUG("len %d jiq_data.len %d\n", len, data->len);
 	data->jiffies = j;
 	return 1;
 }
 
 static void jiq_print_wq(struct work_struct *work)
 {
-	PDEBUG();
 	struct clientdata *data = container_of(work, struct clientdata,
 								jiq_work);
 
@@ -84,9 +81,8 @@ static void jiq_print_wq(struct work_struct *work)
 
 static int jiq_read_wq_show(struct seq_file *s, void *v)
 {
-	struct wait_queue_entry wait;
+	wait_queue_entry_t wait;
 
-	PDEBUG();
 
 	init_wait(&wait);
 	jiq_data.len = 0;
@@ -95,9 +91,9 @@ static int jiq_read_wq_show(struct seq_file *s, void *v)
 	jiq_data.delay = 0;
 
 	prepare_to_wait(&jiq_wait, &wait, TASK_INTERRUPTIBLE);
-	PDEBUG();
 
 	schedule_work(&jiq_data.jiq_work); // jiq_print_wq()
+	PDEBUG();
 	schedule();
 	finish_wait(&jiq_wait, &wait);
 	
@@ -119,6 +115,7 @@ static const struct proc_ops jiq_read_wq_pops = {
 
 static int jiq_init(void)
 {
+	init_waitqueue_head(&jiq_wait);
 	INIT_WORK(&jiq_data.jiq_work, jiq_print_wq);
 
 	proc_create("jiqwq", 0, NULL, &jiq_read_wq_pops);

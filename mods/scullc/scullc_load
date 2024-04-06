@@ -1,0 +1,24 @@
+#!/bin/bash
+
+module="scullc"
+device="scullc"
+mode="644"
+
+# insmod return 1 represent failed, than exit 1
+insmod ./$module.ko || exit 1
+
+if grep -q '^staff:' /etc/group; then
+	group="staff"
+else
+	group="wheel"
+fi
+
+major=$(awk "\$2==\"$module\" {print \$1}" /proc/devices)
+
+rm -f /dev/${device}[0-3]
+mknod /dev/${device}0 c $major 0
+mknod /dev/${device}1 c $major 1
+mknod /dev/${device}2 c $major 2
+mknod /dev/${device}3 c $major 3
+chgrp $group /dev/${device}[0-3]
+chmod $mode /dev/${device}[0-3]

@@ -1,0 +1,8 @@
+#!/bin/sh
+
+module="scullc"
+device="scullc"
+
+rmmod $module $*
+
+rm -f /dev/${device}*

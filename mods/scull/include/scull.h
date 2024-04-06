@@ -8,7 +8,7 @@
 
 #    define PDEBUG(fmt, args...) printk( KERN_DEBUG "[ %s ] %s:%d %s() " \
 		fmt, THIS_MODULE->name, __FILE__, __LINE__, __func__, ##args)
-//#    define PDEBUG(fmt, args...) printk(KERN_DEBUG \
+//#    define PDEBUG(fmt, args...) printk(KERN_DEBUG
 //							fmt, ##args)
 #  else
 #    define PDEBUG(fmt, args...) printf("[ %s ] %s:%d %s() " \

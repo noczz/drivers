@@ -346,7 +346,7 @@ int scull_access_init(dev_t firstdev)
 {
 	int result, i;
 
-	result = register_chrdev_region(firstdev, scull_a_nr_devs, "sculla");
+	result = register_chrdev_region(firstdev, scull_a_nr_devs, "scullac");
 	if (result < 0) {
 		PDEBUG("device number registration failed\n");
 		return 0;

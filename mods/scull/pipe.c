@@ -313,9 +313,9 @@ int scull_pipe_init(dev_t firstdev)
 {
 	int i, result;
 
-	result = register_chrdev_region(firstdev, scull_p_nr_devs, "scullp");
+	result = register_chrdev_region(firstdev, scull_p_nr_devs, "scullpi");
 	if (result < 0) {
-		printk(KERN_NOTICE "Unable to gets scullp region, error %d\n",
+		printk(KERN_NOTICE "Unable to gets scullpi region, error %d\n",
 								result);
 		return 0;
 	}

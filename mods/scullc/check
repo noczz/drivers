@@ -1,0 +1,29 @@
+#!/bin/sh
+
+echo 'cat /proc/devices | grep scullc'
+cat /proc/devices | grep scullc
+
+devfiles=$(ls -l /dev/scullc*)
+
+echo
+echo 'Hello'
+
+if [ -n "$devfiles" ]; then
+	echo 'Hello, I am scull0' > /dev/scullc0
+	echo 'Herlo, I am scull1' > /dev/scullc1
+	echo 'Hello, I am scull2' > /dev/scullc2
+	echo 'Hello, I am scull3' > /dev/scullc3
+	echo
+	echo 'cat /dev/scull[0-3]'
+	cat /dev/scull[0-3]
+else
+	echo "/dev/scullc* don't exist"
+fi
+
+echo
+echo 'cat /proc/scullc_proc'
+cat /proc/scullc_proc
+
+echo
+echo 'scullc devices:'
+ls -al /dev/scullc*
