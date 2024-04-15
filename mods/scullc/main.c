@@ -19,6 +19,11 @@ int scullc_nr_devs = SCULLC_NR_DEVS;
 int scullc_quantum = SCULLC_QUANTUM;
 int scullc_qset    = SCULLC_QSET;
 
+module_param(scullc_major, int, S_IRUGO);
+module_param(scullc_minor, int, S_IRUGO);
+module_param(scullc_quantum, int, S_IRUGO);
+module_param(scullc_qset, int, S_IRUGO);
+
 struct scullc_dev *scullc_devices;
 struct kmem_cache *scullc_cache;
 
@@ -32,7 +37,8 @@ int scullc_trim(struct scullc_dev *dev)
 		if (dptr->data) {
 			for (i = 0; i < qset; i++)
 				if (dptr->data[i])
-					kmem_cache_free(scullc_cache, dptr->data[i]);
+					kmem_cache_free(scullc_cache,
+							dptr->data[i]);
 			kfree(dptr->data);
 			dptr->data = NULL;
 		}
@@ -144,29 +150,37 @@ ssize_t scullc_write(struct file *filp, const char __user *buf, size_t count,
 	int item, s_pos, q_pos, rest;
 	ssize_t retval = -ENOMEM;
 
+	PDEBUG("count %ld\n", count);
+
 	if (mutex_lock_interruptible (&dev->lock))
 		return -ERESTARTSYS;
 
 	item = ((long) *f_pos) / itemsize;
 	rest = ((long) *f_pos) % itemsize;
-	s_pos = rest / itemsize; q_pos = quantum % itemsize;
+	s_pos = rest / quantum; q_pos = rest % quantum;
+	PDEBUG("item %d, rest %d, s_pos %d, q_pos %d\n",
+					item, rest, s_pos, q_pos);
 
 	dptr = scullc_follow(dev, item);
+	PDEBUG("dptr %px\n", dptr);
 	if (!dptr->data) {
 		dptr->data = kmalloc(qset * sizeof(void *), GFP_KERNEL);
 		if (!dptr->data)
 			goto fail;
 		memset(dptr->data, 0, qset * sizeof(void *));
 	}
+	PDEBUG("dptr->data[s_pos] %px\n", dptr->data[s_pos]);
 	if (!dptr->data[s_pos]) {
 		dptr->data[s_pos] = kmem_cache_alloc(scullc_cache, GFP_KERNEL);
 		if (!dptr->data[s_pos])
 			goto fail;
 		memset(dptr->data[s_pos], 0, quantum * sizeof(char));
 	}
+	PDEBUG("dptr->data[s_pos] %px\n", dptr->data[s_pos]);
 	if (count > quantum - q_pos)
 		count = quantum - q_pos;
-	if (copy_from_user(dptr->data[s_pos]+q_pos + q_pos, buf, count)) {
+	if (copy_from_user(dptr->data[s_pos]+q_pos, buf, count)) {
+		PDEBUG("copy_from_user error\n");
 		retval = -EFAULT;
 		goto fail;
 	}
@@ -175,10 +189,12 @@ ssize_t scullc_write(struct file *filp, const char __user *buf, size_t count,
 	if (dev->size < *f_pos)
 		dev->size = *f_pos;
 	mutex_unlock(&dev->lock);
+	PDEBUG();
 	return count;
 
 fail:
 	mutex_unlock(&dev->lock);
+	PDEBUG();
 	return retval;
 }
 
@@ -214,7 +230,7 @@ static void scullc_setup_cdev(struct scullc_dev *dev, int index)
 void scullc_cleanup(void)
 {
 	int i;
-	dev_t devno = MKDEV(scullc_major, scullc_major);
+	dev_t devno = MKDEV(scullc_major, scullc_minor);
 
 	for (i = 0; i < scullc_nr_devs; i++) {
 		cdev_del(&scullc_devices[i].cdev);
@@ -243,7 +259,7 @@ int scullc_init(void)
 		scullc_major = MAJOR(devno);
 	}
 	if (result < 0) {
-		PDEBUG( KERN_WARNING "can't get major %d\n", scullc_major);
+		printk( KERN_WARNING "can't get major %d\n", scullc_major);
 		return result;
 	}
 
@@ -261,7 +277,7 @@ int scullc_init(void)
 		scullc_setup_cdev(scullc_devices + i, i);
 	}
 
-	scullc_cache = kmem_cache_create("scullc", scullc_quantum, 0,
+	scullc_cache = kmem_cache_create_usercopy("scullc", scullc_quantum, 0,
 							SLAB_HWCACHE_ALIGN, NULL);
 	if (!scullc_cache) {
 		scullc_cleanup();
