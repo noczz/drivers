@@ -12,18 +12,23 @@ INCLUDES = -I $(PWD)/include
 EXTRA_CFLAGS += $(DEBFLAGS)
 EXTRA_CFLAGS += $(INCLUDES)
 
+# For Arm corss compiling add the line below
+EXTRA_CFLAGS += -fno-stack-protector
+
 ifneq ($(KERNELRELEASE),)
 
-obj-m := hello.o
+obj-m := led.o
 
 else
 
-KERNELDIR ?= ker/linux
 PWD       := $(shell pwd)
+KERNELDIR ?= ker/linux-rpi-6.6.y
+
 CROSS = ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
 
 modules:
-	$(MAKE) -C $(KERNELDIR) M=$(PWD) $(CROSS) modules
+	make -C $(KERNELDIR) M=$(PWD) $(CROSS) modules
+	make clean
 
 endif
 

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+module="led"
+device="led"
+
+rmmod $module $*
+
+rm -f /dev/${device}*
+
+# Check
+echo CHECK
+echo
+echo 'cat /proc/devices | grep led'
+cat /proc/devices | grep led
+echo 'ls -l /dev/led'
+ls -l /dev/led
