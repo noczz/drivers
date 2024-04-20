@@ -9,12 +9,14 @@
 #include "debug.h"
 #include "gpio.h"
 
+#define IOC_MAGIC 'k'
+#define LED_IOCRESET	_IO(IOC_MAGIC, 0)
+#define GPIO_ON		_IO(IOC_MAGIC, 1)
+#define GPIO_OFF	_IO(IOC_MAGIC, 2)
+#define IOC_MAXNR 2
+
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("NoCz");
-
-//#define GPIO_FSEL0	GPIO_BASE + GPIO_FSEL0_OFFSET
-//#define GPIO_SET0	GPIO_BASE + GPIO_SET0_OFFSET
-//#define GPIO_CLR0	GPIO_BASE + GPIO_CLR0_OFFSET
 
 static unsigned long gpio_phys = GPIO_BASE;
 static void __iomem * gpio_base;	// GPIO Logical address
@@ -26,24 +28,103 @@ struct led_dev {
 	struct cdev cdev;
 } led_device;
 
+/*
+ * LED Operations
+ */
+
+int led_open(struct inode *inode, struct file *filp)
+{
+	struct led_dev *dev;
+
+	dev = container_of(inode->i_cdev, struct led_dev, cdev);
+	filp->private_data = dev;
+
+	return 0;
+}
+
+int led_release(struct inode *inode, struct file *filp)
+{
+	return 0;
+}
+
+/*
+ * GPIO registers operations
+ */
+
+void gpmode(unsigned long no, int mode)
+{
+	int val = -1;;
+
+	val &= ioread32(gpio_base + GPIO_FSEL0_SHIFT);
+	PDEBUG("GPFSEL0 0x%08X\n", val);
+
+	val &= ~MASK_FSEL(no);
+	val |= SET_GPFSEL(no, mode);
+	PDEBUG("GPFSEL0 0x%08X\n", val);
+	iowrite32(val, gpio_base + GPIO_FSEL0_SHIFT);
+	return;
+}
+
+void gpset(unsigned long no)
+{
+	int val = 0;
+
+	val |= SET_GPSET(no, 1);
+	PDEBUG("GPSET0 0x%08X\n", val);
+	iowrite32(val, gpio_base + GPIO_SET0_SHIFT);
+	return;
+}
+
+void gpclr(unsigned long no)
+{
+	int val = 0;
+
+	val |= SET_GPCLR(no, 1);
+	PDEBUG("GPFCLR0 0x%08X\n", val);
+	iowrite32(val, gpio_base + GPIO_CLR0_SHIFT);
+	return;
+}
+
+long led_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	int result = 0, err;
+	if (_IOC_TYPE(cmd) != IOC_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > IOC_MAXNR) return -ENOTTY;
+
+	if (_IOC_DIR(cmd) & _IOC_READ)
+		err = access_ok((void __user *)arg, _IOC_SIZE(cmd));
+	else if (_IOC_DIR(cmd) & _IOC_READ)
+		err = access_ok((void __user *)arg, _IOC_SIZE(cmd));
+	if (err) return -EFAULT;
+
+	switch(cmd) {
+		case GPIO_ON:
+			PDEBUG();
+			gpmode(arg, GPOUT);
+			gpset(arg);
+			break;
+		case GPIO_OFF:
+			PDEBUG();
+			gpclr(arg);
+			break;
+		default:
+			return -ENOTTY;
+	}
+	return result;
+}
+
 struct file_operations led_fops = {
 	.owner	 = THIS_MODULE,
-////	.open	 = led_open,
-////	.release = led_release,
+	.open	 = led_open,
+	.release = led_release,
+	.unlocked_ioctl = led_ioctl,
 };
 
 static void __exit led_cleanup(void)
 {
-	int val = 0;
 	struct led_dev *dev = &led_device;
 
 	printk(KERN_ALERT "LED clean up.\n");
-
-	// GPIO operations
-
-	/* Clean GPIO pins values */
-	val |= (SET_GPCLR(2, 1) | SET_GPCLR(3, 1) | SET_GPCLR(4, 1));
-	iowrite32(val, gpio_base + GPIO_CLR0_OFFSET);
 
 	/* Clean and Del cdev */
 	cdev_del(&dev->cdev);
@@ -109,30 +190,6 @@ static int __init led_init(void)
 		PDEBUG("Error %d adding cdev\n", err);
 		goto fail;
 	}
-
-	// LED Operations
-	int val = 0;
-
-//	val = -1;
-//	val &= ioread32(gpio_base + GPIO_FSEL0_OFFSET);
-//	PDEBUG("GPFSEL0 0x%0X\n", val);
-
-	// Set GPIO pins to out mode
-	val |= (SET_GPFSEL(2, GPOUT) |
-		SET_GPFSEL(3, GPOUT) |
-		SET_GPFSEL(4, GPOUT));
-	iowrite32(val, gpio_base + GPIO_FSEL0_OFFSET);
-
-	// Set GPIO pins value
-	val = ~(MASK_SET(2) | MASK_SET(3) | MASK_SET(4));
-
-	val |= (SET_GPSET(2, 1) | SET_GPSET(3, 1) | SET_GPSET(4, 1));
-	PDEBUG("GPSET0 0x%0X\n", val);
-	iowrite32(val, gpio_base + GPIO_SET0_OFFSET);
-
-//	val = -1;
-//	val &= ioread32(gpio_base + GPIO_SET0_OFFSET);
-//	PDEBUG("GPSET0 0x%0X\n", val);
 
 	return 0;
 fail:

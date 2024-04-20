@@ -22,7 +22,7 @@ obj-m := led.o
 else
 
 PWD       := $(shell pwd)
-KERNELDIR ?= ker/linux-rpi-6.6.y
+KERNELDIR ?= ../../ker/linux-rpi-6.6.y
 
 CROSS = ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
 

@@ -114,6 +114,6 @@ void scull_remove_proc(void);
 #define SCULL_IOCHQUANTUM	_IO(SCULL_IOC_MAGIC, 11)
 #define SCULL_IOCHQSET		_IO(SCULL_IOC_MAGIC, 12)
 
-#define SCULL_IOC_MAXNR 14
+#define SCULL_IOC_MAXNR 12
 
 #endif

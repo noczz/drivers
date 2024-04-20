@@ -1,6 +1,6 @@
 # dir
-mods/rpi/ker
-mods/rpi-drivers
+rpi/ker
+rpi/examples
 
 # file
 *.swp
